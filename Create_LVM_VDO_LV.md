@@ -39,13 +39,13 @@ Currently I don't have an extra physical disk to practice LVM and VDO on, I am s
 
 1. Create an empty file for disk simulation
     
-    ![Disk Size before File creation](.\imgs\LVM_VDO_1.png)
+    ![Disk Size before File creation](./imgs/LVM_VDO_1.png)
     
 ````bash
     sudo fallocate -l10G /root/disk1
 ````
 
-    ![Disk Size after File creation](.\imgs\LVM_VDO_2.png)
+    ![Disk Size after File creation](./imgs/LVM_VDO_2.png)
 
     note:
         I am creating a 10 GB sparse file. This file simulates a real disk, which is great for labs. It contains no data yet; space is just reserved logically on the filesystem.
@@ -57,7 +57,7 @@ Currently I don't have an extra physical disk to practice LVM and VDO on, I am s
 
     sudo losetup -f /root/disk1 --show
 
-    ![First Free Loop Device](.\imgs\LVM_VDO_3.png)
+    ![First Free Loop Device](./imgs/LVM_VDO_3.png)
 
     note:
         -f = Finds the first free loop device
@@ -77,7 +77,7 @@ Currently I don't have an extra physical disk to practice LVM and VDO on, I am s
     note:
         vgcreate first creates a Physical Volume (PV) on /dev/loopxy. Then it groups that PV into a VG called myvg
 
-    ![Volume Group and Loop device act as physical volume](.\imgs\LVM_VDO_4.png)
+    ![Volume Group and Loop device act as physical volume](./imgs/LVM_VDO_4.png)
 
 
 4. Create LVM-based VDO volume
@@ -93,16 +93,16 @@ Currently I don't have an extra physical disk to practice LVM and VDO on, I am s
 
         Because VDO supports **thin provisioning**, you can make the logical size (50G) larger than the physical space (10 GB loop device) — the VDO engine compresses and deduplicates data to fit it efficiently.
 
-    ![LVM-based VDO volume](.\imgs\LVM_VDO_5.png)    
+    ![LVM-based VDO volume](./imgs/LVM_VDO_5.png)    
 
 
 5. Format the new logical volume with the XFS filesystem (recommended for VDO)
 
     sudo mkfs.xfs -K /dev/myvg/myvdolv
 
-    ![XFS filesystem](.\imgs\LVM_VDO_6.png) 
+    ![XFS filesystem](./imgs/LVM_VDO_6.png) 
 
-    ![List of block devices](.\imgs\LVM_VDO_7.png) 
+    ![List of block devices](./imgs/LVM_VDO_7.png) 
 
 
 Monitor LV VDO
@@ -120,7 +120,7 @@ You can enable/disable it at pool level
 
     lvchange --deduplication y|n myvg/myvdolv
 
-![Example](.\imgs\LVM_VDO_8.png) 
+![Example](./imgs/LVM_VDO_8.png) 
 
 To view the space
 
@@ -137,7 +137,7 @@ Mount VDO LV to temporary area
             df -h /mnt
             vdostats --human-readable
 
-![Compare the filesystem used size and VDO LV used size, before for loop](.\imgs\LVM_VDO_9.png) 
+![Compare the filesystem used size and VDO LV used size, before for loop](./imgs/LVM_VDO_9.png) 
 
         for i in {1..9} ; do cp /boot/initramfs-0-rescue-415fa3778d2f45a2818864c6eeafd591.img /mnt/f$i; done
 
@@ -146,7 +146,7 @@ Mount VDO LV to temporary area
             df -h /mnt
             vdostats --human-readable
 
-![Compare the filesystem used size and VDO LV used size, After for loop](.\imgs\LVM_VDO_10.png) 
+![Compare the filesystem used size and VDO LV used size, After for loop](./imgs/LVM_VDO_10.png) 
 
 
 Cleanup
