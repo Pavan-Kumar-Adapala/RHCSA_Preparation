@@ -41,9 +41,8 @@ Currently I don't have an extra physical disk to practice LVM and VDO on, I am s
     
     ![Disk Size before File creation](./imgs/LVM_VDO_1.png)
     
-````bash
+
     sudo fallocate -l10G /root/disk1
-````
 
     ![Disk Size after File creation](./imgs/LVM_VDO_2.png)
 
@@ -60,6 +59,7 @@ Currently I don't have an extra physical disk to practice LVM and VDO on, I am s
     ![First Free Loop Device](./imgs/LVM_VDO_3.png)
 
     note:
+        
         -f = Finds the first free loop device
         --show = prints the first free loop device
 
