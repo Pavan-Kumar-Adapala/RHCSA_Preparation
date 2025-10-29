@@ -156,3 +156,62 @@ Cleanup
     vgremove myvg -y
     losetup -d /dev/loop0
     rm -f /root/disk1
+
+
+Note:
+
+The purpose of fallocate and losetup, These are lab simulation tools. I am using them only because:
+
+    - I don’t have a real extra disk in your RHEL VM, and
+    - I still want to practice LVM and VDO creation safely.
+
+When I have a real extra hard disk
+-----------------------------------
+
+If I have a real second disk, say /dev/sdb, then:
+
+    - I do not need fallocate
+
+    - I do not need losetup
+
+Because /dev/sdb is already a real block device, and Linux can use it directly for LVM or VDO.
+
+````bash
+# Suppose your extra disk is /dev/sdb
+lsblk
+
+# Create volume group directly on the real disk
+vgcreate myvg /dev/sdb
+
+# Create VDO logical volume
+lvcreate --type vdo --name myvdolv --virtualsize 50G myvg
+
+# Format it
+mkfs.xfs /dev/myvg/myvdolv
+
+# Mount and use
+mkdir /mnt/vdo
+mount /dev/myvg/myvdolv /mnt/vdo
+````
+
+
+Real-time, practical scenarios where VDO (Virtual Data Optimizer) is genuinely useful
+======================================================================================
+
+1. Virtualization Environments (KVM, VMware, etc.)
+
+- Virtual machines often have duplicate data (same OS files, same packages).
+- VDO’s deduplication stores those identical blocks only once.
+- we can host more VMs on less physical storage.
+
+2. Backup and Archiving Systems
+
+Backups have lots of repeated data (incremental copies, same files).
+    - VDO stores identical blocks only once.
+    - Combined with compression, you drastically cut storage usage.
+
+3. Private and Hybrid Cloud Storage (OpenStack, OpenShift)
+
+Cloud workloads generate lots of images and containers that share base layers.
+    - Deduplication + compression reduce the footprint of container and VM images.
+    - Thin provisioning lets you overcommit storage safely.
