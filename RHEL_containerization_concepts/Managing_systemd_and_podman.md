@@ -170,16 +170,21 @@ This setting is required for systemd-based containers to function properly.
 How It Works?
 
 Changes an SELinux boolean to allow containers to manage host-level cgroups
+
     sudo setsebool -P container_manage_cgroup true
 
 Create a separate directory for the project
+    
     mkdir test && cd test
+
         Create a Dockerfile
+            ````
             FROM docker.io/fedora
             RUN dnf install -y systemd at httpd && dnf clean all
             RUN systemctl enable httpd atd
             EXPOSE 80
             CMD ["/usr/sbin/init"]
+            ````
 
 Create Image
     podman image build -t web .
