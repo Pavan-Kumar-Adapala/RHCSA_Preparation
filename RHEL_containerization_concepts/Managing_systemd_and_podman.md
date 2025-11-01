@@ -187,14 +187,19 @@ Create a separate directory for the project
             ````
 
 Create Image
+
     podman image build -t web .
 
 Check the Image and run the container
+    
     podman image ls
+
     podman container run -d --name webby -p 80:80 web
 
 Test the web application access and container details
+    
     curl localhost
+
     podman container top webby
 
     sudo podman exec -it webby /bin/bash
