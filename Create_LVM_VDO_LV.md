@@ -38,10 +38,10 @@ Practical process:
 
 Before going into practical, I need to install lvm, vdo, Kernel module, kvdo
 
-    sudo dnf install -y lvm2 vdo kmod-kvdo
+    sudo dnf install lvm2 vdo kmod-kvdo -y
 
 
-Currently I don't have an extra physical disk to practice LVM and VDO on, I am simulating a disk using empty file.
+Currently, I don't have an extra physical disk to practice LVM and VDO on, I am simulating a disk using empty file.
 
 1. Create an empty file for disk simulation
     
