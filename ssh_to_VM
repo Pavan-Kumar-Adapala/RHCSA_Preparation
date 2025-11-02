@@ -1,0 +1,26 @@
+SSH to VM from your laptop or remote system:
+-------------------------------------------
+
+1. Login into your VM and Check the listing tcp ports
+
+Make sure SSH 22 in the list also check the IP range
+````bash
+user1@localhost ~]$ ss -ntl
+````
+
+2. Check the private IP of the VM
+````bash
+sudo ip -4 addr show
+````
+
+3. if SSH port 22 in the list, than
+
+Open CMD in remote machine run the below command
+
+````bash
+ssh user1@192.168.88.128
+````
+enter Password of the user1.
+
+
+
