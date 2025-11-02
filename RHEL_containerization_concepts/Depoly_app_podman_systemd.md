@@ -144,10 +144,12 @@ sudo systemctl enable container-mystatapp
 
 Test self-healing by killing the container process::
 
-````bash
+
 kill -9 <pid>
 
+Note: Killing the container process manually simulates an unexpected crash. Because it’s now managed by systemd, the container automatically restarts — demonstrating lifecycle self-healing without Kubernetes.
 
+````bash
 [user1@localhost ~]$ sudo kill -9 1607
 sudo kill -9 1607
 
