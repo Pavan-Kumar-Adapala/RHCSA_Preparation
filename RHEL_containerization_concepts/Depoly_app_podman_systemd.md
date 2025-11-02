@@ -1,9 +1,8 @@
 # Deploying and Managing a Containerized React Application as a System Service on RHEL (Using Podman + VMware Port Forwarding)
-============================================================================================================================
+
 I deployed a static portfolio site (React + TypeScript) inside a Podman container on a RHEL VM running in VMware Workstation. The goal was to manage it as a system service (systemd unit file) and access it externally.
 
 ## Containers as a Service — Practical Session
-----------------------------------------------
 
 I containerized my personal portfolio application developed with React and TypeScript, then deployed it on RHEL 9 using Podman integrated with systemd.
 
@@ -31,8 +30,7 @@ sudo firewall-cmd --reload
 
 That’s when I realized that VMware’s NAT network does not forward ports from the host → guest automatically. we need to configure that manually in VMware.
 
-## Option 1: Configure Port Forwarding in VMware Workstation
-------------------------------------------------------------
+### Option 1: Configure Port Forwarding in VMware Workstation
 
 1. **Open VMware Workstation**
    → Menu bar → **Edit → Virtual Network Editor** → Change settings
@@ -186,7 +184,7 @@ c522bd7f8909  docker.io/adapaladocker/personal_portfolio_3d:Prod  nginx -g daemo
 ````
 ---
 
-## Option 2: Use Bridged Networking (Easier for Local LAN)
+### Option 2: Use Bridged Networking (Easier for Local LAN)
 
 If you frequently need external devices to reach your VM:
 
@@ -218,7 +216,7 @@ Use it only in trusted networks.
 ---
 
 
-## ✅ Recommended (Safe) Setup for You
+## ✅ Recommended (Safe) Setup
 
 | Goal                                    | Best Choice                | Why                               |
 | --------------------------------------- | -------------------------- | --------------------------------- |
