@@ -41,13 +41,13 @@ That’s when I realized that VMware’s NAT network does not forward ports from
 
 3. Click **“NAT Settings…”**
 
-![NAT settings edit](./imgs/Virtual_network.png)
+![NAT settings edit](../imgs/Virtual_network.png)
 
-![NAT settings edit](./imgs/Virtual_network_editor.png) 
+![NAT settings edit](../imgs/Virtual_network_editor.png) 
 
 4. In the new window, click **“Add…”**
 
-![NAT settings edit](./imgs/NAT_portforwarding.png) 
+![NAT settings edit](../imgs/NAT_portforwarding.png) 
 
 
 5. **Fill in the fields exactly like this:**
@@ -102,7 +102,7 @@ sudo firewall-cmd --reload
 
 and refresh the browser.
 
-![Result](./imgs/application.png) 
+![Result](../imgs/application.png) 
 
 ---
 
