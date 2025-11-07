@@ -702,7 +702,8 @@ Question:
 	Delete the original file and observe behavior difference.
 
 Answer:
-	````bash
+
+````bash
 	touch testfile
 	echo "This file used for practice links." > testfile
 	chmod 640 testfile
@@ -716,7 +717,7 @@ Answer:
 		123456 -rw-r----- 2 user1 devops  35 Nov  5 21:40 hardlink1
 		123456 -rw-r----- 2 user1 devops  35 Nov  5 21:40 testfile
 		123789 lrwxrwxrwx 1 user1 user1    8 Nov  5 21:40 softlink1 -> testfile
-	````
+````
 
 	👉 Notice:
 
@@ -757,6 +758,7 @@ Question:
 Create a soft link **/tmp/passlink to /etc/passwd** and a hard link **/tmp/shadowlink to /etc/shadow**. Explain which one succeeds and why.
 
 answer:
+
 ````bash
 [user1@localhost ~]$ ln -s /etc/passwd /tmp/passlink
 
