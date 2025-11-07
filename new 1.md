@@ -1,16 +1,19 @@
 Day 1:
 
-Install RHEL
--------------
+## Install RHEL
+
 - using ISO, developer account subscription
 - using Vagrant
  
-Connect to RHEL using SSH
---------------------------
+## Connect to RHEL using SSH
+
 In real time, remote login into the VM using the SSH. mostly using username and password, sometimes username and private key.
 
+Full information: RHCSA_Preparation/ssh_to_VM
 
 ---
+
+## Module 01 - linux Essentials
 
 sudo useradd -m <username>
 
@@ -403,6 +406,14 @@ nano
 vim
 
 note: vimtutor
+
+
+sudo yum install -y vim-enhanced
+
+we can add abbrevations into ~/.vimrc  # shortcuts
+
+ex:
+	echo 'abbr _sh #!/bin/bash' >> ~/.vimrc
 
 ---
 
@@ -1018,7 +1029,7 @@ sudo yum install -y star
 2 utilites
 
 	gzip / gunzip
-	
+
 	bzip2 / bunzip2
 	
 
@@ -1052,24 +1063,26 @@ time bzip2 etc.tar
 bunzip2 etc.tar.bz2 # unzip
 
 
+Questions:
+
+**Create a compressed archive /root/etc_backup.tar.bz2 of /etc excluding /etc/selinux.**
+
+sudo tar -cjf /root/etc_backup.tar.bz2 --exclude=/etc/selinux /etc
+
+**Create a directory /data/private where only the owner can list and access files, but others can’t even see filenames.**
+
+mkdir -p -m 500 /data/private
+
+(list r + access x)
 
 
-=============Module 2============
+## Module 02 - Bash/Shell Scripting
+
+- Script interpreter/shell interpreter (shebang)
 
 
-Bash/Shell Scripting
-====================
-
-overview
---------
-- working with bash exit codes and simple logic
-- creating scripts and processing arguments
-- reading user input during execution
-- using logic and looping syntax
-- using functions to improve your code
-
--------bash exit codes and simple logic------
-Traditional CLI commands for loops
+**Run the Loops with CLI commands**
+Traditional CLI commands for loops (for, while)
 
 	for i in Hallo pavan Tuschss; do echo $i; done
 	
@@ -1082,134 +1095,148 @@ How to know the type?
 
 	type for  # this provides the type information about the for
 
+How to know the type of file?
 
-example:
-Create 3 users with home directories?
+	file <filename.extension>
+	
+
+
+Example:
+
+	Create 3 users with home directories?
 
 	for user in pavan ram hari; do sudo useradd -m $user; echo Password1 | sudo passwd --stdin $user; tail -n1 /etc/passwd; done
 
-Delete 3 users and also their home directories?
+	Delete 3 users and also their home directories?
 
 	for user in pavan ram hari; do sudo userdel -r $user; tail -n3 /etc/passwd; done
 
+### working with bash exit codes and simple logic
 
-Exit Codes
------------
+**Exit Codes**
+
 0 -> is success
 
-
 variable-> $? -> provides recent command exit code
+
 echo $?
 
 getent passwd bob ; echo $? # if user exit than value 0
 
 
-simple logic
--------------
+**simple logic**
+
 There was explantion behind the "simple logics" used in the loops.
-	&& -> used to combine two commands, but we need to understand "The second command only runs if the first command succeeds.
+
+	&& -> used to combine two commands, but we need to understand - "The second command only runs if the first command succeeds"
+	
 	mkdir dir1 && cd dir1
 	
-	|| -> the second command only runs if the first command fails.
+	|| -> the second command only runs if the first command fails
+
 	cd dir || mkdir dir1
 
-example:
+Example:
 
-cd mkt || mkdir mkt && cd mkt # you get error message, if cd mkt file doesn't exist, but it creates and cd to mkt
+	cd mkt || mkdir mkt && cd mkt  # you get error message, if cd mkt file doesn't exist. the right part after || creates and cd to mkt
 
-pwd
+	pwd
 
-cd 
+	cd 
 
-rm -r mkt
+	rm -r mkt
 
-cd mkt 2>/dev/null || mkdir mkt && cd mkt  # you doesn't get error message because error redirected to /dev/null
+	The previous command improved
 
-pwd
+	cd mkt 2>/dev/null || mkdir mkt && cd mkt  # you doesn't get error message because error redirected to /dev/null
 
-cd 
+	pwd
 
-cd mkt 2>/dev/null || mkdir mkt && cd mkt # you got cd error message, 
-becuase each command independent so in background
+	cd  # returns to user home directory
 
-cd mkt 2>/dev/null || mkdir mkt  # cd mkt success so skip the mkdir mkt, than
-cd mkt # error because no directory
+	cd mkt 2>/dev/null || mkdir mkt && cd mkt # you got cd error message, becuase each command independent 
 
-solution: grouping the commands
+	what happening in the background?:
 
-cd 
-
-rm -r mkt
-
-cd mkt 2>/dev/null || { mkdir mkt && cd mkt; }
-
-pwd
-
-cd
-
-cd mkt 2>/dev/null || mkdir mkt && cd mkt
-
-pwd
-
-cd mkt 2>/dev/null || mkdir mkt && cd mkt
-
-pwd
-
-
-
------------- shell scripts ---------------
-
-sudo yum install -y vim-enhanced
-
-we can add abbrevations into ~/.vimrc  # shortcuts
-ex:
-	echo 'abbr _sh #!/bin/bash' >> ~/.vimrc
-
-
-how to know the type of file?
-
-	file <filename.extension>
+		cd mkt 2>/dev/null || mkdir mkt  # cd mkt success so skip the mkdir mkt, than
 	
+		cd mkt # error because no mkt directory inside mkt direcctory (mkt/mkt)
 
-- Script interpreter/shell interpreter
+	solution: grouping the commands
+
+````bash
+	cd 
+
+	rm -r mkt
+
+	[user1@localhost ~]$ cd mkt 2>/dev/null || { mkdir mkt && cd mkt; }
+	[user1@localhost mkt]$ pwd
+	/home/user1/mkt
+	[user1@localhost mkt]$ cd 
+	[user1@localhost ~]$ cd mkt 2>/dev/null || { mkdir mkt && cd mkt; }
+	[user1@localhost mkt]$ pwd
+	/home/user1/mkt
+	[user1@localhost mkt]$ cd mkt 2>/dev/null || mkdir mkt && cd mkt
+	[user1@localhost mkt]$ pwd
+	/home/user1/mkt/mkt
+````
 
 
-PATH Environment variable
---------------------------
+**PATH Environment variable**
+
 we can run the script irrespective of file path. To do this we need add the file path to PATH environmental variable.
 
-example
-touch my.sh
+[user1@localhost ~]$ $PATH
 
-mkdir bin && mv my.sh bin/
-
-chmod -v +x my.sh
+bash: /home/user1/.local/bin:/home/user1/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin: No such file or directory
 
 
-which my.sh
+Example
+
+	touch my.sh
+
+	mkdir bin && mv my.sh bin/
+
+	chmod -v +x my.sh
+
+	which my.sh
+
+	[user1@localhost ~]$ which my.sh
+
+	~/bin/my.sh
+
 
  
-Special variables
------------------
+**Special variables**
 
 $$ - current PID
+
 $? - exit status of previous command
+
 !$ - Last argument  (useful in scripts)
+
 $0 - program names
+
 $1 - first argument
+
 $# - arguments count
+
 $* - all arguments as a string
+
 $@ - all arguments as an array
 
 
-------------- Automating the user creation process -----------------
+
+**Scripting - Automating the user creation process**
+
+- creating scripts and processing arguments
+- reading user input during execution
+- using logic and looping syntax
+- using functions to improve your code
 
 Question:
 
-Create a script taking an argument for the username, the script should not proceed if the name is not supplied.
-Use conditional statements to ensure we only try to create the account if it does not already exit.
-The password will be collected during script execution using the read command.
-For confirmation, the new user account deatils are printed to the screem.
+Create a script taking an argument for the username, the script should not proceed if the name is not supplied. Use conditional statements to ensure we only try to create the account if it does not already exit. The password will be collected during script execution using the read command. For confirmation, the new user account deatils are printed to the screem.
 
 
 ----------------Functions and loops------
