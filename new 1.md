@@ -492,12 +492,16 @@ The Linux file system is a method of storing and organizing data in a single, un
 It is a logical organization that is independent of the specific **physical file system types (like ext4 or XFS)** used on the underlying storage devices.
 
 In simple words:
+
 A file system is a method that the operating system uses to:
+
 - **Store and organize data** on storage devices (like HDDs, SSDs, USB drives).
 - **Manage how data** is read, written, and accessed.
 
 Note:
+
 I found the below links very useful to deepen the understanding of Filesystem:
+
 - https://dev.to/prodevopsguytech/understanding-the-linux-filesystem-an-in-depth-guide-for-devops-engineers-ona
 - About File system hierarchy standard: https://refspecs.linuxfoundation.org/FHS_3.0/fhs/index.html
 
@@ -519,26 +523,6 @@ I found the below links very useful to deepen the understanding of Filesystem:
 	s -> Sockets: Used for network communication (e.g., /dev/log)
 
 
-
-**Listing the file permissions**
-
-	ls		-> (list without metadata)
-	ls -l	-> (List with metadata and no hiden fiels info, l for long)
-	ls -la	-> (List with metadata and hiden files, a for all)
-	ls -ld	-> (only directories list, d for directory)
-
-
-	stat - display file or file system status 
-	-----------------------------------------
-		stat /etc
-		
-		stat -c %a /etc (-c configuration values, %a numeric version of permissions)
-		
-		stat -c %A /etc (%A sysmbolic format)
-
-
-	
-	
 **About File permissions in Linux**
 
 	read - 4 (decimal), 100 (binary) - read a file or list directory content
@@ -554,88 +538,306 @@ default directory permissions - 0777
 
 umask -> based the user umask value the default permissions change
 
-example:
+Example scenarios:
 
-if umask value of user 0002
+umask
+
+if umask value of user 0002:
+
 	default file permissions of user - 0664
+
 	default directory permissions of user - 0775
 	
-if umask value of user 0022
+if umask value of user 0022:
+
 	file permissions - 0644
+
 	directory permissions - 0755
 	
-How to change?
 
-umask 000
+How to set umask value?
 
-umask 077
+	umask 000
 
-or ...
+	umask 077 
 
-
-Changing/Adjust the file permissions
-------------------------------------
-chmod
-
-chmod -v (-v display the old and new permissionsin terminal)
-
-touch file 1
-chmod -v 666 file1
-
-example:
-umask 007
-mkdir -p upper/{dir1, dir2}
-touch upper/{dir1, dir2}/file1
-
-ls -lR upper/{dir1, dir2}/file1  (R - recursively)
-
-chmod -vR a+X upper    (a for all objects, X execute permision)
-
-check the difference:
-chmod -vR +x upper
-chmod -vR a+w upper
+	...
 
 
-Ownership modification
------------------------
+**Listing the file permissions**
+
+	ls		-> (list without metadata)
+	ls -l	-> (List with metadata and no hiden fiels info, l for long)
+	ls -la	-> (List with metadata and hiden files, a for all)
+	ls -ld	-> (only directories list, d for directory)
+
+
+	stat - display file or file system status 
+	-----------------------------------------
+
+		stat /etc
+		
+		stat -c %a /etc (-c configuration values, %a numeric version of permissions)
+		
+		stat -c %A /etc (%A sysmbolic format)
+
+
+#### Set and Changing file permissions
+
+**Changing/set the file permissions - chmod**
+
+	chmod -v (-v display the old and new permissions in the terminal)
+
+	Example 01: Change the file permissions to a paticular file
+
+		touch file 1
+
+		chmod -v 666 file1
+
+
+	Example 02: First set permissions using umask, before Creating the files or directories
+
+		umask 007 -> means default file permission 660, default directory permission 770
+
+		mkdir -p upper/{dir1, dir2} or mkdir -p upper/dir{1..2}
+
+		touch upper/{dir1, dir2}/file1 # Creating file1 in both directories (dir1, dir2)
+
+		ls -lR upper  (R - recursively)
+
+		````bash
+		[user1@localhost ~]$ ls -lR upper
+		upper:
+		total 0
+		drwxrwx---. 2 user1 user1 19 Nov  7 09:51 dir1   (770)
+		drwxrwx---. 2 user1 user1 19 Nov  7 09:51 dir2   (770)
+
+		upper/dir1:
+		total 0
+		-rw-rw----. 1 user1 user1 0 Nov  7 09:51 file1	(660)
+
+		upper/dir2:
+		total 0
+		-rw-rw----. 1 user1 user1 0 Nov  7 09:51 file1	(660)
+		````
+
+		check the difference:
+
+		````bash
+		chmod -vR +x upper
+		
+		[user1@localhost ~]$ chmod -vR +x upper
+		mode of 'upper' retained as 0770 (rwxrwx---)
+		mode of 'upper/dir1' retained as 0770 (rwxrwx---)
+		mode of 'upper/dir1/file1' changed from 0660 (rw-rw----) to 0770 (rwxrwx---)
+		mode of 'upper/dir2' retained as 0770 (rwxrwx---)
+		mode of 'upper/dir2/file1' changed from 0660 (rw-rw----) to 0770 (rwxrwx---)
+		````
+
+		````bash
+		chmod -vR a+x upper    (a for all objects, x execute permision)
+
+		[user1@localhost ~]$ chmod -vR a+X upper 
+		mode of 'upper' changed from 0770 (rwxrwx---) to 0771 (rwxrwx--x)
+		mode of 'upper/dir1' changed from 0770 (rwxrwx---) to 0771 (rwxrwx--x)
+		mode of 'upper/dir1/file1' changed from 0770 (rwxrwx---) to 0771 (rwxrwx--x)
+		mode of 'upper/dir2' changed from 0770 (rwxrwx---) to 0771 (rwxrwx--x)
+		mode of 'upper/dir2/file1' changed from 0770 (rwxrwx---) to 0771 (rwxrwx--x)
+		````
+
+**Manage File Ownership - chown, chgrp**
+
 chown - change both user and group ownership
+
 chgrp - change group ownership
-id
 
-touch file1
-sudo chown user:group file1
+id - print real and effective user and group IDs
 
-sudo chgrp group file1
+Example:
+
+	touch file1
+
+	sudo chown user:group file1
+
+	sudo chgrp group file1
 
 
+**Link Files**
 
-Managing the Links
-------------------
+2 types of link files are available in the Linux.
+1. Hard link files
+2. Soft link files
+
+Hard links are just extra names linked to the same metadata that means **Another name pointing to the same inode**.
+
+Soft links are a special file type that links to the destination file (A separate file that points to the path of another file). This is a completely a new file that is used as a link to the target. The file type shows as "l" for link.
+
 
 mkdir -p upper/{dir1, dir2}
 
-ls -ldi upper upper/.    (i - Inode)
+ls -ldi upper upper/.    # (i - Inode, d - directories)
 
 ls -ldi upper upper/. upper/dir1/.. upper/dir2/..
 
 upper and upper/. Inode is same (Hard link)
 
-Hard links are just extra names linked to the same metadata. 
-on the other hand soft links are a special file type that links to the destination file.
-this is a completely new file that is used as a link to the target. the file type shoes as a "l" for link.
 
-sysmbolic or soft links
+
+Soft Link (Symbolic Link)
+
 example:
 
-ln -s /etc/services --> this creates a new file "services" in the current directory
+	ln -s /etc/services --> this creates a new file "services" in the current directory
 
-ls -l services --> this is a link file, that links to /etc/services (destination)
+	ls -l services --> this is a link file, that links to /etc/services 
 
-or
+	or
 
-ln -s /etc/services ports (ports is target)
+	ln -s /etc/services ports (ports is destination)
 
-------I need to deep down this concept----
+
+
+**Soft Link (Symbolic Link) vs Hard Links**
+
+Question:
+
+	ln testfile hardlink1
+
+	ln -s testfile softlink1
+
+	Delete the original file and observe behavior difference.
+
+Answer:
+	````bash
+	touch testfile
+	echo "This file used for practice links." > testfile
+	chmod 640 testfile
+	chown user1:devops testfile
+
+	ln testfile hardlink1
+	ln -s testfile softlink1
+
+	ls -li testfile hardlink1 softlink1
+
+		123456 -rw-r----- 2 user1 devops  35 Nov  5 21:40 hardlink1
+		123456 -rw-r----- 2 user1 devops  35 Nov  5 21:40 testfile
+		123789 lrwxrwxrwx 1 user1 user1    8 Nov  5 21:40 softlink1 -> testfile
+	````
+
+	👉 Notice:
+
+	testfile and hardlink1 have the same inode (123456) and link count = 2
+
+	softlink1 has a different inode (123789) and just stores a pointer -> testfile
+
+
+	When you delete testfile:
+````bash
+	rm testfile
+````
+
+	- The directory entry testfile is removed.
+
+	- The inode is deleted only if no other hard link references it.
+
+	Since **hardlink1** still references that inode:
+
+	- The file still exists (data intact!)
+
+	- You can still cat hardlink1 ✅
+
+	But **softlink1** points to the name testfile, which no longer exists:
+
+	- The link becomes broken
+
+	- It turns red or flashing (depending on your terminal theme)
+
+	Access fails:
+````bash
+		cat softlink1
+		cat: softlink1: No such file or directory
+````
+
+Question:
+
+Create a soft link **/tmp/passlink to /etc/passwd** and a hard link **/tmp/shadowlink to /etc/shadow**. Explain which one succeeds and why.
+
+answer:
+````bash
+[user1@localhost ~]$ ln -s /etc/passwd /tmp/passlink
+
+[user1@localhost ~]$ ln /etc/shadow /tmp/shadowlink
+ln: failed to create hard link '/tmp/shadowlink' => '/etc/shadow': Operation not permitted
+
+[user1@localhost ~]$ ls -l /tmp
+total 0
+lrwxrwxrwx. 1 user1 user1 11 Nov  7 11:10 passlink -> /etc/passwd
+drwx------. 3 root  root  17 Nov  7 08:41 systemd-private-22d22baaae2b441493479c3ac9ef7643-chronyd.service-SsmSsV
+drwx------. 2 user1 user1  6 Oct 29 18:32 Temp-33c97bb4-2e26-48be-aa1d-738f7fbb138d
+drwx------. 2 root  root   6 Nov  1 11:52 vmware-root_910-2697139510
+
+
+[user1@localhost ~]$ cat /tmp/passlink 
+````
+
+Troubleshooting:
+
+````bash
+[user1@localhost ~]$ ls -l /etc | grep shadow
+----------.  1 root root      1360 Nov  5 18:38 shadow
+----------.  1 root root      1338 Nov  5 18:34 shadow-
+
+[user1@localhost ~]$ ls -l /etc | grep passwd
+-rw-r--r--.  1 root root      2030 Nov  5 18:38 passwd
+-rw-r--r--.  1 root root      1977 Nov  5 18:34 passwd-
+````
+
+Notice: 
+
+The shadow file doesn't have any permissions for others, where as passwd as read permissions to others. so used **sudo**
+
+````bash
+[user1@localhost ~]$ sudo ln /etc/shadow /tmp/shadowlink
+[sudo] password for user1: 
+
+[user1@localhost ~]$ ls -l /tmp
+lrwxrwxrwx. 1 user1 user1   11 Nov  7 11:10 passlink -> /etc/passwd
+----------. 2 root  root  1360 Nov  5 18:38 shadowlink
+
+[user1@localhost ~]$ ls -l /etc | grep -e "shadow"
+----------.  2 root root      1360 Nov  5 18:38 shadow
+----------.  1 root root      1338 Nov  5 18:34 shadow-
+````
+
+
+🧱 Hard Link:
+
+You’re literally telling Linux:
+
+“Create another name for this inode.”
+
+So Linux needs:
+
+- To read the original file’s inode → requires execute permission on its directory (to traverse it).
+
+- To add a new entry in the target directory → requires write + execute on the destination directory.
+
+It doesn’t need to “read” the file data, but it must access the inode.
+
+
+🪶 Soft Link:
+
+You’re telling Linux:
+
+“Create a tiny file containing this path name.”
+
+So Linux only needs:
+
+- Write access to the directory where you’re placing the link (to create the file).
+
+- It doesn’t even check if the target exists or if you can access it!
+
+
 
 
 Adding users and groups
