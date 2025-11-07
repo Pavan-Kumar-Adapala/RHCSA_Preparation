@@ -1009,13 +1009,16 @@ ls -lh etc.tar
 
 
 **star**
+
 sudo yum install -y star
 
 
 **File compression**
 
 2 utilites
+
 	gzip / gunzip
+	
 	bzip2 / bunzip2
 	
 
