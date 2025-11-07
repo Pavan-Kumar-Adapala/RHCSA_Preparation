@@ -836,7 +836,8 @@ So Linux only needs:
 
 
 
-**User and Group Management**
+User and Group Management
+-------------------------
 
 ````bash
 sudo usermod -aG wheel user1 # adding user1 to wheel group
@@ -846,8 +847,7 @@ id user1
 
 Note: If the group details are not updated, than Logout and Login to see the changes
 
-Create User and group
----------------------
+**Create User and group**
 
 ````bash
 # creating user with home directory (/home/alice)
@@ -861,8 +861,7 @@ sudo usermod -aG devops alice
 ````
 
 
-switch groups - sg, newgrp:
-------------------------------
+**Switch groups - sg, newgrp**
 
 touch file1
 
@@ -881,8 +880,7 @@ exit # return to previous shell
 Check the file1 and file2 group names
 
 
-Switch users:
--------------
+**Switch users**
 
 su  (switched to the root user, your working directory won't change)
 
@@ -894,73 +892,112 @@ su -l
 
 su - user1
 
-Archiving Files in Linux
-=========================
-- write-only files
-- securing directories
-- archiving files using tar and star
-- file compression using gzip and bzip2
 
+Question:
 
-write-only files
-----------------
+Add a user developer who has a private group devteam and a home directory /home/devdir. Then add this user to the wheel group.
+
+sudo groupadd devteam
+
+sudo useradd -m -d /home/devdir -g devteam developer
+
+sudo passwd developer
+
+sudo usermod -aG wheel developer
+
+````bash
+[user1@localhost ~]$ id -Gn developer
+devteam wheel
+
+[user1@localhost ~]$ cat /etc/passwd | grep developer
+developer:x:1003:1003::/home/devdir:/bin/bash
+
+[user1@localhost ~]$ groups developer
+developer : devteam wheel
+
+[user1@localhost ~]$ id developer
+uid=1003(developer) gid=1003(devteam) groups=1003(devteam),10(wheel)
+
+````
+---
+
+**write-only files**
+
+````bash
 touch log
 
 ls -l log
 
 chmod -v u=w log  (u - user)
 
-ls -l log
+ls -l log (it works)
 
 cat log (permision denied, because user have only write permision)
 
 echo "new line added" >> log
 
 sudo cat log 
+````
 
 
-Securing directories
---------------------
+**Securing directories**
 
 mkdir -m 155 project1 (m - mode, 1 for user, 5 for group, 5 for others)
 
-ls project1
+ls -l project1 (permision denied, required r)
 
+ls -ld project1 (Success, because of x)
 
-cd project1
+cd project1 (sucess, becuase of x)
 
-ls (permision denied)
+ls (permision denied, required r)
 
 cd ..
 
 chmod -v u=wx project1
 
-echo "new information into new file" > project1/file1
+echo "new information into new file" > project1/file1 (sucess, because w + x)
 
-cat project1/file1   (this command works, because the user have execute permissions)
+cat project1/file1   (this command works, because x on directory level, r on file level)
+
+-rw-rw----. 1 user1 user1 30 Nov  7 15:39 file1
 
 ls project1 (permission denied, because user doesn't have read permision)
 
-Where it is useful?
-The user know the files in the directory and he execute the files in the directory.
-secure because no one can see the files inside the directory.
 
-tar
----
+Note:
 
-tar - Tape Archives
+Short, clear rules to memorize:
 
-tar can be used to create file archives. 
+To list directory contents: r on the directory.
 
-tar file is not compressed but may appear to be a slightly small size than the original content. this is due to the more efficient use of blocks in the filesystem.
+To enter a directory or access files by name: x on the directory.
+
+To create/delete files inside: w + x on the directory.
+
+To read a file: r on the file (and x on the directory).
+
+To delete a file: w on the directory (file’s own perms don’t matter for deletion).
 
 
+
+### Archiving Files in Linux
+
+- archiving files using tar and star
+- file compression using gzip and bzip2
+
+
+**tar - Tape Archives**
+
+tar can be used to create file archives. tar file is not compressed but may appear to be a slightly small size than the original content. this is due to the more efficient use of blocks in the filesystem.
+
+````bash
 sudo du -sh /etc (du - disk usage, s - size of summary)
 
 sudo tar -cf etc.tar /etc 
 
 ls -lh etc.tar
-
+````
 
 -c for create
 
@@ -971,13 +1008,12 @@ ls -lh etc.tar
 -f archive file
 
 
-star
-----
+**star**
 sudo yum install -y star
 
 
-file compression
-----------------
+**File compression**
+
 2 utilites
 	gzip / gunzip
 	bzip2 / bunzip2
@@ -987,8 +1023,12 @@ tar -czf (z for gzip)
 
 tar -cjf (j for bzip2)
 
+to extract:
 
-example:
+tar -xzf etc_backup.tar.gz -C /tmp/restore
+
+
+Example:
 
 sudo tar -cf etc.tar /etc
 
@@ -1002,7 +1042,7 @@ to expand the gzip file (unzip)
 
 	gunzip etc.tar.gz
 	
-
+Simllary
 
 time bzip2 etc.tar
 
