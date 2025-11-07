@@ -479,12 +479,6 @@ Question:
 
 ### Securing files in the Filesystem
 
-- List, set, and change standard file permissions
-- Evaluate permissions needed for file operations and diagnose access issues
-- manage file ownership
-- create and manage links
-- switch user accounts
-
 **What is the Filesytem in Linux?**
 
 The Linux file system is a method of storing and organizing data in a single, unified hierarchical tree structure starting from a single root directory (/), where everything, including hardware devices and processes, is treated as a file. 
@@ -840,22 +834,34 @@ So Linux only needs:
 
 
 
-Adding users and groups
------------------------
+**User and Group Management**
 
-id
-
+````bash
 sudo usermod -aG wheel user1 # adding user1 to wheel group
 
 id user1
+````
 
-id 
+Note: If the group details are not updated, than Logout and Login to see the changes
 
-Note: Logout and Login to see the changes
+Create User and group
+---------------------
+
+````bash
+# creating user with home directory (/home/alice)
+sudo useradd -m alice
+sudo passwd alice
+
+# creating group
+sudo groupadd devops
+# adding user (alice) to group (devops)
+sudo usermod -aG devops alice
+````
 
 
-switching groups:
-   --------
+switch groups - sg, newgrp:
+------------------------------
+
 touch file1
 
 ls -l file1
@@ -873,14 +879,18 @@ exit # return to previous shell
 Check the file1 and file2 group names
 
 
-switching user IDs:
-   ----------
+Switch users:
+-------------
+
 su  (switched to the root user, your working directory won't change)
 
+The below both commands gives a full login shell and start in the root user's home directory
+
 su - 
-su -l (both commands gives a full login shell and start in the root user's home directory)
 
+su -l 
 
+su - user1
 
 Archiving Files in Linux
 =========================
