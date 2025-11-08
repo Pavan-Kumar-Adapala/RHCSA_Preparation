@@ -1209,37 +1209,171 @@ Example
  
 **Special variables**
 
-$$ - current PID
+	$$ - current PID
 
-$? - exit status of previous command
+	$? - exit status of previous command
 
-!$ - Last argument  (useful in scripts)
+	!$ - Last argument  (useful in scripts)
 
-$0 - program names
+	$0 - program names
 
-$1 - first argument
+	$1 - first argument
 
-$# - arguments count
+	$# - arguments count
 
-$* - all arguments as a string
+	$* - all arguments as a string
 
-$@ - all arguments as an array
+	$@ - all arguments as an array
 
-
-
-**Scripting - Automating the user creation process**
 
 - creating scripts and processing arguments
 - reading user input during execution
 - using logic and looping syntax
 - using functions to improve your code
 
+**Scripting - Automating the user creation process**
+
 Question:
 
 Create a script taking an argument for the username, the script should not proceed if the name is not supplied. Use conditional statements to ensure we only try to create the account if it does not already exit. The password will be collected during script execution using the read command. For confirmation, the new user account deatils are printed to the screem.
 
 
-----------------Functions and loops------
+### Loops and Functions
+
+---
+
+
+## Module 03 - Operating running systems
+
+### Rebooting and shutting down systems
+
+- shutdown 
+
+	* shutdown command
+	* restricting user login
+
+	shutdown [OPTIONS...] [TIME] [WALL...]
+
+		Shut down the system.
+
+		Options:
+			--help      Show this help
+		-H --halt		Halt the machine
+		-P --poweroff	Power-off the machine
+		-r --reboot		Reboot the machine
+		-h				Equivalent to --poweroff, overridden by --halt
+		-k				Don't halt/power-off/reboot, just send warnings
+		--no-wall		Don't send wall message before halt/power-off/reboot
+		-c				Cancel a pending shutdown
+		--show			Show pending shutdown
+
+	Examples:
+
+	Sudo shutdowm 20+ "shutting down in 20 minutes"
+
+	sudo shutdown 17:00 "system going down at 5 pm"
+
+	sudo shutdown now "System going down"
+
+- reboot
+- poweroff
+
+Restricting User Access:
+
+Creating the file **/etc/nologin** standard users are restricted from logging into the system. 
+
+Using the shutdown command, standard users are restricted from login when less than 5 mintues remain before the event. This is controlled via **/run/nologin** (ls /run/nologin).
+
+
+Example:
+
+````bash
+sudo touch /etc/nologin
+
+The above command restrict the users login after the file creation even it is an empty file. The current login is not terminated. This helpful in server maintaince time, not allow users to login into system.
+
+C:\Users\User>ssh user1@192.168.88.128
+user1@192.168.88.128's password:
+Connection closed by 192.168.88.128 port 22
+
+sudo rm /etc/nologin
+
+C:\Users\User>ssh user1@192.168.88.128
+user1@192.168.88.128's password:
+Last failed login: Sat Nov  8 19:57:31 CET 2025 from 192.168.88.1 on ssh:notty
+There was 1 failed login attempt since the last successful login.
+Last login: Sat Nov  8 19:56:36 2025 from 192.168.88.1
+````
+
+````bash
+[user1@localhost ~]$ shutdown -r +2 "Rebooting the system"
+Reboot scheduled for Sat 2025-11-08 19:46:04 CET, use 'shutdown -c' to cancel.
+
+[user1@localhost ~]$ ls /run/nologin
+/run/nologin
+
+[user1@localhost ~]$ sudo cat /run/nologin
+System is going down. Unprivileged users are not permitted to log in anymore. For technical details, see pam_nologin(8).
+````
+
+**Another way to Reboot / Poweroff the system**
+
+````bash
+sudo systemctl poweroff
+
+sudo systemctl reboot
+
+[user1@localhost ~]$ ls -l $(which reboot)
+lrwxrwxrwx. 1 root root 16 Jan 28  2025 /usr/sbin/reboot -> ../bin/systemctl
+
+[user1@localhost ~]$ ls -l $(which poweroff)
+lrwxrwxrwx. 1 root root 16 Jan 28  2025 /usr/sbin/poweroff -> ../bin/systemctl
+````
+
+The Disadvantage:
+
+These are immediate actions, so users won't get any time or message to save their work. These commands are not used in the real-time environments.
+
+
+### Recovering root password
+
+**Boot Process**
+
+power on system, this starts - BIOS and BIOS locate boot partition - the boot partition should GRUB loded in it, the GRUB boot loader start Linux kernel - the kernel is loaded but prior to this the initialization ram disk is loaded to customize the boot process to your hardware (drives).
+
+
+**Interrupting the boot process**
+
+
+
+**SELinux and file context**
+
+
+
+**Resetting the root password**
+
+
+The scenario of recovering root password:
+
+If a system is not used frequently, it is possible the root password may become forgotten.
+
+
+
+
+
+### Managing system services using systemctl
+
+- start/stop
+- enable/disable/--now
+
+Adjusting system performance
+
+- top / htop
+- ps, pgrep, pkill, kill
+
+Managing logs
+
+- journalctl
 
 
 
