@@ -1398,9 +1398,10 @@ In VMWare workstation / Oracle Virtual box
 
 3. Add additional kernel boot arguments 
 
-	rd.break -> the argument used to break the boot process, so we can change /sysroot permissions in mount and reset the root password
+	rd.break -> the argument used to break the boot process, so we can remount /sysroot with read and write permissions and reset the root password
 
-	enforcing=0 -> allowing errors, when the root login into the system initial time. After that set enforcing 1
+
+	enforcing=0 -> allowing errors, when the root login into the system initial time. After that set enforcing 1 (in techinical terms: In permissive mode, SELinux logs policy violations but doesn’t enforce them. Always re-enable enforcing mode after fixing issues)
 
 ![Example](./imgs/grub_1.png) 
 
@@ -1425,6 +1426,12 @@ Enforcing
 ````
 
 **SELinux and file context**
+
+SELinux Contexts protect files by labeling them with a type, user, and role.
+
+If the **/etc/shadow** file label is wrong (e.g., changed from shadow_t to user_home_t), authentication fails because PAM can’t read it.
+
+**restorecon** command resets it to the correct context from SELinux policy.
 
 Note: Do only on the Lab system not in production systems
 
