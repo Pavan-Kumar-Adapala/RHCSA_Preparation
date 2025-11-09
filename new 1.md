@@ -10,6 +10,46 @@ Day 1:
 In real time, remote login into the VM using the SSH. mostly using username and password, sometimes username and private key.
 
 Full information: RHCSA_Preparation/ssh_to_VM
+ 
+
+## Hypervisors
+
+What is the Hypervisor?
+
+Hypervisor is a software used to create and runs virtual machines on host machine. 
+
+What Hypervisor will do?
+
+Hypervisor abstracts the underliying resources of host machine and allows the host machine share hardware resources among the VMs.
+
+Types of Hypervisors?
+
+There are 2 types of hypervisors:
+
+1. type 1 hypervisor (Bare metal or native)
+
+	------------------------
+	| vm1 |  vm2  | ... vmn
+	------------------------
+      hypervisor 
+	  (VMWare ESXi, Hyper-V)
+	------------------------
+      Hardware resources
+	------------------------
+
+2. type 2 hypervisor (Hosted Hypervisor)
+
+	------------------------
+	| vm1 |  vm2  | ... vmn
+	------------------------
+      hypervisor 
+	  (VMWare Workstation, 
+	  Oracle vm Virtual box)
+	------------------------
+          Host OS
+	------------------------
+      Hardware resources
+	------------------------
 
 ---
 
@@ -1342,23 +1382,87 @@ These are immediate actions, so users won't get any time or message to save thei
 power on system, this starts - BIOS and BIOS locate boot partition - the boot partition should GRUB loded in it, the GRUB boot loader start Linux kernel - the kernel is loaded but prior to this the initialization ram disk is loaded to customize the boot process to your hardware (drives).
 
 
-**Interrupting the boot process**
-
-
-
-**SELinux and file context**
-
-
-
-**Resetting the root password**
-
+**Interrupting the boot process && Resetting the root password**
 
 The scenario of recovering root password:
 
 If a system is not used frequently, it is possible the root password may become forgotten.
 
+Process:
+
+In VMWare workstation / Oracle Virtual box
+
+1. VM → Poweron
+
+2. Press Esc repeatedly (immediately, when the VM window appear), than e (for edit)
+
+3. Add additional kernel boot arguments 
+
+	rd.break -> the argument used to break the boot process, so we can change /sysroot permissions in mount and reset the root password
+
+	enforcing=0 -> allowing errors, when the root login into the system initial time. After that set enforcing 1
+
+![Example](./imgs/grub_1.png) 
+
+4. remount /sysroot with read, write permissions
+
+![Example](./imgs/grub_2.png) 
+
+5. Reset the boot process and continue the boot process
+
+![Example](./imgs/grub_3.png)
+
+````bash
+[root@localhost user1]# getenforce
+Permissive
+[root@localhost user1]# ls -Z /etc/shadow
+system_u:object_r:unlabeled_t:s0 /etc/shadow
+[root@localhost user1]# restorecon -v /etc/shadow
+Relabeled /etc/shadow from system_u:object_r:unlabeled_t:s0 to system_u:object_r:shadow_t:s0
+[root@localhost user1]# setenforce 1
+[root@localhost user1]# getenforce
+Enforcing
+````
+
+**SELinux and file context**
+
+Note: Do only on the Lab system not in production systems
+
+Switch user as root
+
+sudo -i 
+
+next steps:
+
+sudo cat /etc/shadow # this is the place to store the user passwords in hashed format
+
+ls -Z /etc/shadow # SELinux context
+
+chcon -t user_home_t /etc/shadow # chcon - change context
+
+ls -Z /etc/shadow
+
+sudo -i -u user1  # you will get PAM error, because can't authenticate through to the shadow file
+
+restorecon -v /etc/shadow # v for verbose
+
+sudo -i -u user1 # it will work
 
 
+````bash
+[root@localhost ~]# ls -Z /etc/shadow
+system_u:object_r:shadow_t:s0 /etc/shadow
+[root@localhost ~]# chcon -t user_home_t /etc/shadow
+[root@localhost ~]# ls -Z /etc/shadow
+system_u:object_r:user_home_t:s0 /etc/shadow
+[root@localhost ~]# sudo -i -u user1
+sudo: PAM account management error: Authentication service cannot retrieve authentication info
+sudo: a password is required
+[root@localhost ~]# restorecon -v /etc/shadow
+Relabeled /etc/shadow from system_u:object_r:user_home_t:s0 to system_u:object_r:shadow_t:s0
+[root@localhost ~]# sudo -i -u user1
+[user1@localhost ~]$ 
+````
 
 
 ### Managing system services using systemctl
