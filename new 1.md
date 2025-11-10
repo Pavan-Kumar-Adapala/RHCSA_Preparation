@@ -1285,7 +1285,7 @@ Create a script taking an argument for the username, the script should not proce
 
 ## Module 03 - Operating running systems
 
-### Rebooting and shutting down systems
+	### Rebooting and shutting down systems from the CLI
 
 - shutdown 
 
@@ -1474,15 +1474,117 @@ Relabeled /etc/shadow from system_u:object_r:user_home_t:s0 to system_u:object_r
 
 ### Managing system services using systemctl
 
+systemd as the service manager
+
+
 - start/stop
-- enable/disable/--now
 
-Adjusting system performance
+- enable/disable/--now (enable --now -> enable and start the service, diable --now -> disable and stop the service)
 
+- status
+
+**Unit files**
+ 
+unit file types: service, socket, timer, and target 
+
+Unit file location:
+
+- /usr/lib/systemd/system -> the standard location of unmodified unit file
+
+- /etc/systemd/system -> modified or custom unit files overwrite the defaults when added to this path
+
+
+List the unit files:
+
+- systemctl list-units
+
+- systemctl list-units --type socket
+
+- systemctl list-units --type target
+
+- systemctl list-unit-files --type socket
+
+
+Note: 
+
+list-units = loaded systemd units
+
+list-unit-files = All unit files no matter if they have been loaded or not
+
+
+Read and Edit unit files:
+
+systemctl cat <service name>
+
+ex: systemctl cat sshd
+
+editing:
+
+sudo systemctl edit --full sshd (--full = full copy of original file)
+
+systemctl cat sshd (now The location is /etc/systemd/system)
+
+sudo systemctl daemon-reload
+
+
+How to do Mask the service:
+
+1. delete customization
+
+sudo systemctl rm /etc/systemd/system/sshd.service
+
+sudo systemctl daemon-reload
+
+systemctl cat sshd (now the location is usr/lib/systemd/system/sshd.service)
+
+2. mask
+
+sudo systemctl mask sshd --now
+
+sudo systemctl start sshd
+
+Note: mask is useful to wantedly not use the service for some time/task without uninstall the service
+
+
+**Targets replace runlevels used in earlier versions of RHEL**
+
+default run level (booting time): systemctl get-default
+
+Change the default: sudo systemctl set-default graphical.target
+
+
+### Adjusting system performance
+
+**How busy is the system**
+
+- uptime
 - top / htop
+
+To check the no.of CPUs and Cores:
+
+lscpu | grep -E '^(CPU\(s\):|Core\(s\))'
+
+
+Adjusting CPU priority
+
+- nice
+- renice
+- jobs
+
+Managing processes
+
 - ps, pgrep, pkill, kill
 
-Managing logs
+
+ps -fp 1 (ps -> process status, f -> full list, p -> process id )
+
+ss -ntlp
+
+Tuning profiles
+
+
+
+### Managing logs
 
 - journalctl
 
