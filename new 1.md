@@ -90,6 +90,10 @@ How to check the groups the user belog to?
 	or
 
 	groups user1
+
+	or
+
+	id # current user full details
 	
 
 Question:
@@ -120,6 +124,7 @@ Create a sudoers policy file for the user
 	sudo visudo -f /etc/sudoers.d/devops
 		
 		devops ALL=(ALL) NOPASSWD: /bin/systemctl restart httpd, /bin/systemctl status httpd
+		
 		# devops ALL=(ALL) NOPASSWD: /bin/systemctl restart httpd.service, /bin/systemctl status httpd.service
 	
 	sudo ls -l /etc/sudoers.d
@@ -1285,7 +1290,7 @@ Create a script taking an argument for the username, the script should not proce
 
 ## Module 03 - Operating running systems
 
-	### Rebooting and shutting down systems from the CLI
+### Rebooting and shutting down systems from the CLI
 
 - shutdown 
 
@@ -1318,7 +1323,7 @@ Create a script taking an argument for the username, the script should not proce
 - reboot
 - poweroff
 
-Restricting User Access:
+**Restricting User Access:**
 
 Creating the file **/etc/nologin** standard users are restricted from logging into the system. 
 
@@ -1562,32 +1567,186 @@ Change the default: sudo systemctl set-default graphical.target
 
 To check the no.of CPUs and Cores:
 
-lscpu | grep -E '^(CPU\(s\):|Core\(s\))'
+	lscpu | grep -E '^(CPU\(s\)|Core\(s\))'
 
 
-Adjusting CPU priority
+**Adjusting CPU priority**
 
-- nice
+- nice (-20 to +19, which adjust the priorty from 60 to 99. 99 is the lowest priority)
+
 - renice
 - jobs
 
-Managing processes
+The nice values of the processes helpful to change the CPU priority of the processes. There exit a releation between process nice value and CPU priority.
+
+Example:
+
+sleep 1000& -> running the command in background
+
+jobs # to check the jobs
+
+ps -elf | grep sleep
+
+or
+
+pgrep sleep # pgrep especially used to search in the processes
+
+check the priority value of the process:
+
+ps -lp $(pgrep sleep)
+
+pkill sleep
+
+
+**with nice value**
+
+nice -n 12 sleep 1000&
+
+ps -lp $(pgrep sleep)
+
+renice 19 <PID>
+
+
+**Managing processes**
 
 - ps, pgrep, pkill, kill
 
+ps
 
-ps -fp 1 (ps -> process status, f -> full list, p -> process id )
+ps -elf (e -> every thing, l -> long lsit)
+
+ps -fp 1 (ps -> process status, f -> full list, p -> process id)
+
+kill -l # list of kill signals
 
 ss -ntlp
 
-Tuning profiles
+
+**Tuning profiles**
+
+tuned-adm active
+
+tuned-adm recommend
+
+tuned-adm list
+
 
 
 
 ### Managing logs
 
-- journalctl
+For example your services are not running/not working, what you will do/where you will search? [debuging]
+
+1. look logs from the **systemctl status**
+- check service **active, enabled, status, logs**
+
+2. /var/log, /var/log/messages
 
 
+3. journalctl
+- I don't need log file information
 
+
+Note: 
+
+The tradetional logging mechanism within modern RHEL is **Rocket Fast Syslog Daemon (rsyslogd)**
+
+- less /etc/rsyslog.conf # default configuration file
+
+- grep 'rsyslog.d' /etc/rsyslog.conf 
+
+we can make custom configuration by creating **/etc/rsyslog.d/my.conf**
+
+ex: /etc/rsyslog.d/my.conf
+
+enter:
+
+local0.info /var/log/my.log 
+
+level0 to level7 are the facilities used for different services (local use).
+
+sudo systemctl restart rsyslog.service
+
+ls -l /var/log
+
+logger -p local0.info "test rsyslog" # creates my.log file and log message entry
+
+ls -l /var/log
+
+sudo tail /var/log/my.log
+
+For more information: 
+
+man 3 syslog # documentation
+
+man 5 rsyslog.conf
+
+
+**Rotate log file using logrotate**
+
+The command **logrotate** is used to maintain the size of the **/var/log** structure. 
+
+It is run by cron daemon or manually. The default configuration file /etc/logrotate.conf, for custom configuration /etc/logrotate.d/<your_file_name.conf>
+
+/var/log/my.log
+{
+	weekly 
+	rotate 4
+	size 100M
+	dateext
+	compress
+	copytruncate
+}
+
+sudo logrotate /etc/logrotate.conf 
+
+or
+
+sudo logrotate /etc/logrotate.d/my.conf
+
+ls -l /var/log/my*
+
+
+man 5 logrotate.conf
+
+
+**journalctl**
+
+sudo journalctl
+
+sudo journalctl -n5
+
+sudo journalctl --since yesterday
+
+sudo journalctl --since yesterday --unit sshd
+
+
+Note:
+
+The journal logs are stored in memory and may not persist as disk files.
+
+How to make persistance?
+
+grep 'Storage' /etc/systemd/journald.conf
+
+sudo sed -i 's/#Storage=auto/Storage=persistent/' /etc/systemd/journald.conf
+
+grep 'Storage' /etc/systemd/journald.conf
+
+sudo systemctl restart systemd-journald
+
+
+sudo journalctl -b -1 (b -> boot process, -1 previous boot details)
+
+**copy logs other files securiy with scp (linux)or winscp (windows)**
+
+
+try to copy the files using 
+- user and password authentication
+- user and ssh key public key authentication
+
+
+## Module 04 - Configuring Local Storage
+
+### Block Storage
 
