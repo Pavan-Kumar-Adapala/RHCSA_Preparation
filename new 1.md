@@ -1779,6 +1779,7 @@ Character devices (c) → under /dev (e.g., /dev/tty, /dev/null) # handles 1 cha
 
 Physical Device → Device Driver → Device File (/dev/sda represents the disk)
 
+```sql
 +------------------+
 |   Physical Disk   |   (HDD/SSD/NVMe)
 +------------------+
@@ -1795,6 +1796,7 @@ Physical Device → Device Driver → Device File (/dev/sda represents the disk)
            |
            |
      User Applications
+```
 
 The device driver is the kernel-side translator between hardware & Linux processes.
 
@@ -1805,6 +1807,7 @@ Ex 1:
 
 cat file1.txt (reading from disk to terminal)
 
+```
 Application (cat)
        |
        v
@@ -1821,6 +1824,7 @@ Device Driver (sd_mod, nvme, loop, etc.)
        |
        v
 Hardware (Disk)
+```
 
 Then the data goes back up the stack:
 
@@ -1987,6 +1991,7 @@ Device files are only for:
 | Can the user read from disk directly? | No                        | Yes, using device files (/dev) |
 
 
+````mathematica
 
                WINDOWS FILE ACCESS PATH
  ┌───────────────────────────────────────────────────────┐
@@ -2051,7 +2056,7 @@ Device files are only for:
  ┌───────────────────────────────────────────────────────┐
  │                     Physical Disk                      │
  └───────────────────────────────────────────────────────┘
-
+````mathematica
 
 ---
 
