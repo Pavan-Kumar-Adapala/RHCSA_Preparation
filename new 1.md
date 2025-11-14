@@ -1750,3 +1750,311 @@ try to copy the files using
 
 ### Block Storage
 
+Block storage refers to **storage devices** that read/write data in fixed-size blocks (usually 512 bytes or 4 KB).
+
+Examples of block devices:
+
+- Hard disks (HDD)
+
+- SSDs
+
+- NVMe drives
+
+- USB drives
+
+- LVM volumes
+
+- Loop devices (virtual block device backed by file)
+
+- SAN/iSCSI disks
+
+
+Location of Block and character devices (/dev)
+
+Block devices (b) → under /dev (e.g., /dev/sda, /dev/nvme0n1, /dev/loop0)
+
+Character devices (c) → under /dev (e.g., /dev/tty, /dev/null) # handles 1 character or byte at a time
+
+**Block Device Architecture**
+
+Physical Device → Device Driver → Device File (/dev/sda represents the disk)
+
++------------------+
+|   Physical Disk   |   (HDD/SSD/NVMe)
++------------------+
+           |
+           v
++------------------+
+|   Device Driver   |  (kernel module: sd_mod, nvme, loop, etc.)
++------------------+
+           |
+           v
++------------------+
+| Device File /dev/sda |
++------------------+
+           |
+           |
+     User Applications
+
+The device driver is the kernel-side translator between hardware & Linux processes.
+
+
+Data flow: 
+
+Ex 1: 
+
+cat file1.txt (reading from disk to terminal)
+
+Application (cat)
+       |
+       v
+Virtual Filesystem Layer (VFS)
+       |
+       v
+Filesystem driver (ext4/xfs)
+       |
+       v
+Block layer
+       |
+       v
+Device Driver (sd_mod, nvme, loop, etc.)
+       |
+       v
+Hardware (Disk)
+
+Then the data goes back up the stack:
+
+Disk → driver → block layer → fs → VFS → cat → stdout → terminal driver → screen
+
+
+For more information: https://opensource.com/article/16/11/managing-devices-linux 
+
+lsmod -> list of loaded kernel modules (drives + other kernel components)
+
+
+
+modinfo sd_mod # Shows metadata for the SATA/SCSI disk driver
+
+modinfo loop # loop device driver info
+
+modinfo nvme # nvme device driver info
+
+lsblk
+
+
+**Loop Devices**
+
+A loop device lets a file behave like a disk.
+
+List current available loop devices:
+
+losetup -a
+
+Create loop device:
+
+sudo losetup -f <disk> --show
+
+Check list of all block devices:
+
+lsblk
+
+man 4 loop
+
+
+Windows vs Linux
+----------------
+
+Windows:
+
+Application → Windows API → NTFS driver → Storage Stack → Disk Driver → Disk
+
+
+Linux:
+
+Application → VFS → Filesystem Driver (ext4/xfs/btrfs) → Block Layer → Device Driver → Disk
+
+**Windows Storage Model**
+
+Disk → Partition → Drive Letter
+
+Example:
+
+* Disk 0 = 1TB
+* Partitions:
+
+  * C:\ (Windows OS)
+  * D:\
+  * E:\
+
+
+**How Windows maps partitions**
+
+Windows uses the **Volume Manager** to assign drive letters.
+
+
+**How Windows reads/writes data**
+
+```
+APP (Notepad, cmd, PowerShell)
+   ↓
+Windows API (CreateFile, ReadFile, WriteFile)
+   ↓
+NTFS / exFAT / ReFS filesystem driver
+   ↓
+Windows Storage Stack
+   ↓
+Disk Driver (StorAHCI, NVMe, USBSTOR)
+   ↓
+Physical Disk
+```
+
+The user **does NOT interact with hardware directly** — Windows API & filesystem drivers do the work.
+
+✔ Windows hides the device files (Windows does NOT have device files like Linux; it uses "Device Objects" internally).
+
+
+**Linux Storage Model**
+
+Disk → Partitions → Mounted Directories
+
+Example:
+
+```
+/dev/nvme0n1     ---> entire disk  
+/dev/nvme0n1p1   ---> /boot
+/dev/nvme0n1p2   ---> LVM PV
+```
+
+**Linux Data Flow**
+
+```
+APP (cat, vim, cp)
+   ↓
+VFS (Virtual File System layer)
+   ↓
+Filesystem driver (xfs/ext4)
+   ↓
+Block Layer (I/O scheduling, merging)
+   ↓
+Device Driver (kernel module: sd_mod, nvme)
+   ↓
+Physical Disk
+```
+
+Linux uses:
+
+* **VFS** (a generic interface)
+* **Filesystem driver**
+* **Block I/O layer**
+
+The device file in `/dev` is *not* the entry point to the user. The **filesystem is the entry point**.
+
+Example:
+
+```
+cat /home/user/file.txt
+```
+
+does *not* go through `/dev/nvme0n1` directly.
+
+The OS maps paths to inodes → filesystem driver → block layer → driver → disk.
+
+
+**Important**
+
+*The device file is NOT for normal file access*
+
+You do **not** read/write `/dev/nvme0n1p1` when accessing normal files.
+
+Device files are only for:
+
+* Disk utilities (fdisk, mkfs, dd)
+* Mounting filesystems
+* Low-level operations
+
+
+# Deep Comparison Table (Windows vs Linux)
+
+| Concept                               | Windows                   | Linux                          |
+| ------------------------------------- | ------------------------- | ------------------------------ |
+| How apps access files                 | Windows API               | VFS                            |
+| Filesystem drivers                    | NTFS, ReFS, exFAT         | ext4, xfs, btrfs               |
+| Hardware access                       | Windows Storage Stack     | Block I/O layer                |
+| Disk driver                           | StorAHCI, NVMe            | sd_mod, nvme                   |
+| Representation of hardware            | Hidden device objects     | Device files in /dev           |
+| Mounting                              | Automatic (drive letters) | Manual mount points            |
+| How user sees storage                 | Drives: C:\ D:\ E:\       | Directories: / /boot /home     |
+| Can the user read from disk directly? | No                        | Yes, using device files (/dev) |
+
+
+
+               WINDOWS FILE ACCESS PATH
+ ┌───────────────────────────────────────────────────────┐
+ │                 Application (Notepad, cmd)            │
+ └───────────────────────────────────────────────────────┘
+                          │
+                          ▼
+ ┌───────────────────────────────────────────────────────┐
+ │              Windows API (ReadFile, WriteFile)        │
+ └───────────────────────────────────────────────────────┘
+                          │
+                          ▼
+ ┌───────────────────────────────────────────────────────┐
+ │         NTFS / ReFS / exFAT Filesystem Driver         │
+ └───────────────────────────────────────────────────────┘
+                          │
+                          ▼
+ ┌───────────────────────────────────────────────────────┐
+ │                  Windows Storage Stack                │
+ │      (Volume Manager, Cache Manager, I/O Manager)     │
+ └───────────────────────────────────────────────────────┘
+                          │
+                          ▼
+ ┌───────────────────────────────────────────────────────┐
+ │          Disk Driver (StorAHCI, NVMe, USBSTOR)        │
+ └───────────────────────────────────────────────────────┘
+                          │
+                          ▼
+ ┌───────────────────────────────────────────────────────┐
+ │                      Physical Disk                     │
+ └───────────────────────────────────────────────────────┘
+
+
+
+
+                     LINUX FILE ACCESS PATH
+ ┌───────────────────────────────────────────────────────┐
+ │    Application (cat, vim, cp, rsync, chromium)        │
+ └───────────────────────────────────────────────────────┘
+                          │
+                          ▼
+ ┌───────────────────────────────────────────────────────┐
+ │        VFS — Virtual File System Layer (generic)      │
+ └───────────────────────────────────────────────────────┘
+                          │
+                          ▼
+ ┌───────────────────────────────────────────────────────┐
+ │   Filesystem Driver (ext4, xfs, btrfs, vfat, iso9660) │
+ └───────────────────────────────────────────────────────┘
+                          │
+                          ▼
+ ┌───────────────────────────────────────────────────────┐
+ │  Block Layer (I/O scheduler: mq-deadline, bfq etc.)    │
+ └───────────────────────────────────────────────────────┘
+                          │
+                          ▼
+ ┌───────────────────────────────────────────────────────┐
+ │     Device Driver (sd_mod, nvme, usb-storage etc.)    │
+ └───────────────────────────────────────────────────────┘
+                          │
+                          ▼
+ ┌───────────────────────────────────────────────────────┐
+ │                     Physical Disk                      │
+ └───────────────────────────────────────────────────────┘
+
+
+---
+
+
+
+

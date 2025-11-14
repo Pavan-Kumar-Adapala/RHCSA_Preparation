@@ -67,12 +67,15 @@ Currently, I don't have an extra physical disk to practice LVM and VDO on, I am 
     note:
         
         -f = Finds the first free loop device
+
         --show = prints the first free loop device
 
         From now on, /dev/loopxy behaves just like a physical disk to the Linux kernel
 
         For checking
+            
             lsblk
+
             losetup -a
 
 
@@ -160,7 +163,7 @@ Cleanup
     umount /mnt
     lvremove /dev/myvg/myvdolv -y
     vgremove myvg -y
-    losetup -d /dev/loop0
+    losetup -d /dev/loop0 (d -> detach)
     rm -f /root/disk1
 
 

@@ -8,3 +8,13 @@ ss -ntl -> ss = socket status
 
 To know the description of the filesystem hierarchy:
     man hier
+
+
+tty -> teletype
+
+lscpu
+
+lsmod -> list modules and drives installed by kernel
+
+
+
