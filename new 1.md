@@ -1752,7 +1752,7 @@ try to copy the files using
 
 Block storage refers to **storage devices** that read/write data in fixed-size blocks (usually 512 bytes or 4 KB).
 
-Examples of block devices:
+Examples of block storage devices:
 
 - Hard disks (HDD)
 
@@ -1834,7 +1834,6 @@ Disk → driver → block layer → fs → VFS → cat → stdout → terminal d
 For more information: https://opensource.com/article/16/11/managing-devices-linux 
 
 lsmod -> list of loaded kernel modules (drives + other kernel components)
-
 
 
 modinfo sd_mod # Shows metadata for the SATA/SCSI disk driver
@@ -1977,7 +1976,7 @@ Device files are only for:
 * Low-level operations
 
 
-# Deep Comparison Table (Windows vs Linux)
+**Deep Comparison Table (Windows vs Linux)**
 
 | Concept                               | Windows                   | Linux                          |
 | ------------------------------------- | ------------------------- | ------------------------------ |
@@ -2056,10 +2055,463 @@ Device files are only for:
  ┌───────────────────────────────────────────────────────┐
  │                     Physical Disk                      │
  └───────────────────────────────────────────────────────┘
-````mathematica
+````
 
 ---
 
+### Creating and partitioning Block Devices
+
+**Adding another disk to system**
+
+power off the VM in VMWare workstation -> go to VM settings -> select Hard Disk -> click **Add** -> Select **disk type** and **virtual or physical disk** -> ok
+
+check:
+
+power on VM -> lsblk
 
 
+**Creating Raw Disk Files and loop devices setup**
+
+There an option to create raw disk files using **dd** or **fallocate**
+
+Check which method is more efficient:
+
+time dd if=/dev/zero of=dd.disk bs=1M count=500
+
+if -> input file
+
+of -> output file
+
+bs -> block size
+
+count -> 500 * 1MiB
+
+
+time fallocate -l 500M fa.disk
+
+
+sudo losetup -f <disk file> --show # Attach next available loop device
+
+sudo losetup /dev/loop1 <disk file> # Attach loop1
+
+losetup -a # List loop devices
+
+sudo losetup -d /dev/loop0 # Delete or detach loop0
+
+sudo losetup -D # Detach all
+
+sudo rm <disk file>
+
+````bash
+time dd if=/dev/zero of=dd.disk bs=1M count=500
+
+time fallocate -l 500M fa.disk
+
+[root@localhost user1]# sudo losetup -f dd.disk --show
+/dev/loop0
+[root@localhost user1]# sudo losetup -f fa.disk --show
+/dev/loop1
+[root@localhost user1]# lsblk
+NAME          MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+loop0           7:0    0   500M  0 loop 
+loop1           7:1    0   500M  0 loop 
+sr0            11:0    1 167.3M  0 rom  /run/media/user1/CDROM
+sr1            11:1    1  11.9G  0 rom  /run/media/user1/RHEL-9-6-0-BaseOS-x86_64
+nvme0n1       259:0    0    60G  0 disk 
+├─nvme0n1p1   259:1    0   600M  0 part /boot/efi
+├─nvme0n1p2   259:2    0     1G  0 part /boot
+└─nvme0n1p3   259:3    0  58.4G  0 part 
+  ├─rhel-root 253:0    0  37.9G  0 lvm  /
+  ├─rhel-swap 253:1    0     2G  0 lvm  [SWAP]
+  └─rhel-home 253:2    0  18.5G  0 lvm  /home
+nvme0n2       259:4    0    10G  0 disk 
+````
+
+
+**Disk Partition**
+
+To partition disk, first you should know about the **Patition tables**.
+
+- Partition table types
+
+	* Traditional one: MBR or MSDOS Table (Master Boot Record) - Max 2TB size - max 4 primary or 3 primary, 1 extended plus logical
+	
+	Note: SCSI driver allows Max 15 partitions
+
+	* New one: GPT / GUID partition table - Part of the UEFI framework - max 8ZB size - max 255 partitions per disk
+
+	Note: SCSI driver allows Max 15 partitions
+
+Commands used for disk partition:
+
+fdisk (MBR) / parted
+
+gdisk (GPT)
+
+
+````bash
+
+# Create partition
+
+root@localhost user1]# 
+[root@localhost user1]# lsblk
+NAME          MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+sr0            11:0    1 167.3M  0 rom  /run/media/user1/CDROM
+sr1            11:1    1  11.9G  0 rom  /run/media/user1/RHEL-9-6-0-BaseOS-x86_64
+nvme0n1       259:0    0    60G  0 disk 
+├─nvme0n1p1   259:1    0   600M  0 part /boot/efi
+├─nvme0n1p2   259:2    0     1G  0 part /boot
+└─nvme0n1p3   259:3    0  58.4G  0 part 
+  ├─rhel-root 253:0    0  37.9G  0 lvm  /
+  ├─rhel-swap 253:1    0     2G  0 lvm  [SWAP]
+  └─rhel-home 253:2    0  18.5G  0 lvm  /home
+nvme0n2       259:4    0    10G  0 disk 
+
+[root@localhost user1]# ls -l /dev | grep nvme0n2
+brw-rw----. 1 root  disk    259,   4 Nov 14 15:49 nvme0n2
+
+[root@localhost user1]# ls -l /dev | grep nvme0n1
+brw-rw----. 1 root  disk    259,   0 Nov 14 15:49 nvme0n1
+brw-rw----. 1 root  disk    259,   1 Nov 14 15:49 nvme0n1p1
+brw-rw----. 1 root  disk    259,   2 Nov 14 15:49 nvme0n1p2
+brw-rw----. 1 root  disk    259,   3 Nov 14 15:49 nvme0n1p3
+
+[root@localhost user1]# sudo fdisk --help
+
+Usage:
+ fdisk [options] <disk>         change partition table
+ fdisk [options] -l [<disk>...] list partition table(s)
+
+Display or manipulate a disk partition table.
+
+Options:
+ -b, --sector-size <size>      physical and logical sector size
+ -B, --protect-boot            don't erase bootbits when creating a new label
+ -c, --compatibility[=<mode>]  mode is 'dos' or 'nondos' (default)
+ -L, --color[=<when>]          colorize output (auto, always or never)
+                                 colors are enabled by default
+ -l, --list                    display partitions and exit
+ -x, --list-details            like --list but with more details
+ -n, --noauto-pt               don't create default partition table on empty devices
+ -o, --output <list>           output columns
+ -t, --type <type>             recognize specified partition table type only
+ -u, --units[=<unit>]          display units: 'cylinders' or 'sectors' (default)
+ -s, --getsz                   display device size in 512-byte sectors [DEPRECATED]
+     --bytes                   print SIZE in bytes rather than in human readable format
+     --lock[=<mode>]           use exclusive device lock (yes, no or nonblock)
+ -w, --wipe <mode>             wipe signatures (auto, always or never)
+ -W, --wipe-partitions <mode>  wipe signatures from new partitions (auto, always or never)
+
+ -C, --cylinders <number>      specify the number of cylinders
+ -H, --heads <number>          specify the number of heads
+ -S, --sectors <number>        specify the number of sectors per track
+
+ -h, --help                    display this help
+ -V, --version                 display version
+
+Available output columns:
+ gpt: Device Start End Sectors Size Type Type-UUID Attrs Name UUID
+ dos: Device Start End Sectors Cylinders Size Type Id Attrs Boot End-C/H/S Start-C/H/S
+ bsd: Slice Start End Sectors Cylinders Size Type Bsize Cpg Fsize
+ sgi: Device Start End Sectors Cylinders Size Type Id Attrs
+ sun: Device Start End Sectors Cylinders Size Type Id Flags
+
+For more details see fdisk(8).
+
+[root@localhost user1]# sudo fdisk /dev/nvme0n2
+
+Welcome to fdisk (util-linux 2.37.4).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS disklabel with disk identifier 0xf7471cdd. 
+
+Command (m for help): m
+
+Help:
+
+  DOS (MBR)
+   a   toggle a bootable flag
+   b   edit nested BSD disklabel
+   c   toggle the dos compatibility flag
+
+  Generic
+   d   delete a partition
+   F   list free unpartitioned space
+   l   list known partition types
+   n   add a new partition
+   p   print the partition table
+   t   change a partition type
+   v   verify the partition table
+   i   print information about a partition
+
+  Misc
+   m   print this menu
+   u   change display/entry units
+   x   extra functionality (experts only)
+
+  Script
+   I   load disk layout from sfdisk script file
+   O   dump disk layout to sfdisk script file
+
+  Save & Exit
+   w   write table to disk and exit
+   q   quit without saving changes
+
+  Create a new label
+   g   create a new empty GPT partition table
+   G   create a new empty SGI (IRIX) partition table
+   o   create a new empty DOS partition table
+   s   create a new empty Sun partition table
+
+
+
+Command (m for help): n
+
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+
+Select (default p): p
+Partition number (1-4, default 1): 1
+First sector (2048-20971519, default 2048): 
+
+Last sector, +/-sectors or +/-size{K,M,G,T,P} (2048-20971519, default 20971519): +1G
+
+Created a new partition 1 of type 'Linux' and of size 1 GiB.
+
+Command (m for help): p
+Disk /dev/nvme0n2: 10 GiB, 10737418240 bytes, 20971520 sectors
+Disk model: VMware Virtual NVMe Disk
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0xf7471cdd
+
+Device         Boot Start     End Sectors Size Id Type
+/dev/nvme0n2p1       2048 2099199 2097152   1G 83 Linux
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+
+[root@localhost user1]# lsblk
+NAME          MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+sr0            11:0    1 167.3M  0 rom  /run/media/user1/CDROM
+sr1            11:1    1  11.9G  0 rom  /run/media/user1/RHEL-9-6-0-BaseOS-x86_64
+nvme0n1       259:0    0    60G  0 disk 
+├─nvme0n1p1   259:1    0   600M  0 part /boot/efi
+├─nvme0n1p2   259:2    0     1G  0 part /boot
+└─nvme0n1p3   259:3    0  58.4G  0 part 
+  ├─rhel-root 253:0    0  37.9G  0 lvm  /
+  ├─rhel-swap 253:1    0     2G  0 lvm  [SWAP]
+  └─rhel-home 253:2    0  18.5G  0 lvm  /home
+nvme0n2       259:4    0    10G  0 disk 
+└─nvme0n2p1   259:6    0     1G  0 part 
+
+
+# Delete the partition
+
+root@localhost user1]# sudo fdisk /dev/nvme0n2
+
+Welcome to fdisk (util-linux 2.37.4).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+
+Command (m for help): d
+Selected partition 1
+Partition 1 has been deleted.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost user1]# lsblk
+NAME          MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+sr0            11:0    1 167.3M  0 rom  /run/media/user1/CDROM
+sr1            11:1    1  11.9G  0 rom  /run/media/user1/RHEL-9-6-0-BaseOS-x86_64
+nvme0n1       259:0    0    60G  0 disk 
+├─nvme0n1p1   259:1    0   600M  0 part /boot/efi
+├─nvme0n1p2   259:2    0     1G  0 part /boot
+└─nvme0n1p3   259:3    0  58.4G  0 part 
+  ├─rhel-root 253:0    0  37.9G  0 lvm  /
+  ├─rhel-swap 253:1    0     2G  0 lvm  [SWAP]
+  └─rhel-home 253:2    0  18.5G  0 lvm  /home
+nvme0n2       259:4    0    10G  0 disk 
+
+````
+
+* Created a new DOS disklabel 
+
+* Create Partition table
+	- Partition type
+	- Size
+	- Sector details
+
+sudo parted /dev/nvme0n2 mklabel msdos mkpart primary 0% 25%
+
+````bash
+[root@localhost user1]# sudo parted /dev/nvme0n2 mklabel msdos
+Warning: The existing disk label on /dev/nvme0n2 will be destroyed and all data on this disk will be lost. Do you want to continue?
+Yes/No? Yes                                                               
+Information: You may need to update /etc/fstab.
+
+[root@localhost user1]# sudo parted /dev/nvme0n2 mkpart primary 0% 25%
+Information: You may need to update /etc/fstab.
+
+[root@localhost user1]# lsblk                                             
+NAME          MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+sr0            11:0    1 167.3M  0 rom  /run/media/user1/CDROM
+sr1            11:1    1  11.9G  0 rom  /run/media/user1/RHEL-9-6-0-BaseOS-x86_64
+nvme0n1       259:0    0    60G  0 disk 
+├─nvme0n1p1   259:1    0   600M  0 part /boot/efi
+├─nvme0n1p2   259:2    0     1G  0 part /boot
+└─nvme0n1p3   259:3    0  58.4G  0 part 
+  ├─rhel-root 253:0    0  37.9G  0 lvm  /
+  ├─rhel-swap 253:1    0     2G  0 lvm  [SWAP]
+  └─rhel-home 253:2    0  18.5G  0 lvm  /home
+nvme0n2       259:4    0    10G  0 disk 
+└─nvme0n2p1   259:5    0   2.5G  0 part 
+````
+
+**Working with Filesystems**
+
+Above the disk is partitioned, to use the partition - we need to add a filesystem.
+
+The problem is **Device Names are Transitory (Device naming issue)**
+
+Transitory means, The disk nvme0n1 may be the nvme0n1 today but if it is not the first disk detected on the next boot it will not be nvme0n1, it could be nvme0n2
+
+Solution:
+
+- Filesystems can be optional assigned with a label to identify them
+
+- All filesystems have a UUID (Universaly Unique ID) that uniquely identifies that filesystem.
+
+
+Demo:
+
+Adding a filesystem, we can mount the partition or entire disk using persistent names
+
+
+Make filesystem
+
+sudo mkfs.xfs -L "DATA" /dev/nvme0n2p1
+
+L -> Label (optional)
+
+sudo mount LABEL=DATA /mnt # mounted using the filesystem label
+
+or
+
+sudo mount PARTLABEL=<partlabel> /mnt
+
+How to check the Disk partition label?
+
+lsblk -o name,mountpoint,label,size,uuid
+
+sudo fdisk -l
+
+mount -t xfs
+
+
+````bash
+[root@localhost user1]# sudo mkfs.xfs -L "DATA" /dev/nvme0n2p1
+meta-data=/dev/nvme0n2p1         isize=512    agcount=4, agsize=163776 blks
+         =                       sectsz=512   attr=2, projid32bit=1
+         =                       crc=1        finobt=1, sparse=1, rmapbt=0
+         =                       reflink=1    bigtime=1 inobtcount=1 nrext64=0
+data     =                       bsize=4096   blocks=655104, imaxpct=25
+         =                       sunit=0      swidth=0 blks
+naming   =version 2              bsize=4096   ascii-ci=0, ftype=1
+log      =internal log           bsize=4096   blocks=16384, version=2
+         =                       sectsz=512   sunit=0 blks, lazy-count=1
+realtime =none                   extsz=4096   blocks=0, rtextents=0
+[root@localhost user1]# sudo mount LABEL=DATA /mnt
+[root@localhost user1]# lsblk
+NAME          MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+sr0            11:0    1 167.3M  0 rom  /run/media/user1/CDROM
+sr1            11:1    1  11.9G  0 rom  /run/media/user1/RHEL-9-6-0-BaseOS-x86_64
+nvme0n1       259:0    0    60G  0 disk 
+├─nvme0n1p1   259:1    0   600M  0 part /boot/efi
+├─nvme0n1p2   259:2    0     1G  0 part /boot
+└─nvme0n1p3   259:3    0  58.4G  0 part 
+  ├─rhel-root 253:0    0  37.9G  0 lvm  /
+  ├─rhel-swap 253:1    0     2G  0 lvm  [SWAP]
+  └─rhel-home 253:2    0  18.5G  0 lvm  /home
+nvme0n2       259:4    0    10G  0 disk 
+└─nvme0n2p1   259:5    0   2.5G  0 part /mnt
+[root@localhost user1]# sudo umount /mnt
+[root@localhost user1]# lsblk
+NAME          MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+sr0            11:0    1 167.3M  0 rom  /run/media/user1/CDROM
+sr1            11:1    1  11.9G  0 rom  /run/media/user1/RHEL-9-6-0-BaseOS-x86_64
+nvme0n1       259:0    0    60G  0 disk 
+├─nvme0n1p1   259:1    0   600M  0 part /boot/efi
+├─nvme0n1p2   259:2    0     1G  0 part /boot
+└─nvme0n1p3   259:3    0  58.4G  0 part 
+  ├─rhel-root 253:0    0  37.9G  0 lvm  /
+  ├─rhel-swap 253:1    0     2G  0 lvm  [SWAP]
+  └─rhel-home 253:2    0  18.5G  0 lvm  /home
+nvme0n2       259:4    0    10G  0 disk 
+└─nvme0n2p1   259:5    0   2.5G  0 part 
+
+# Using Filesystem UUID
+
+[root@localhost user1]# sudo blkid /dev/nvme0n2p1
+/dev/nvme0n2p1: LABEL="DATA" UUID="58187d3a-aaa8-4c34-844d-1d3ef06d446b" TYPE="xfs" PARTUUID="24bd0e25-01"
+
+[root@localhost user1]# sudo mount UUID="58187d3a-aaa8-4c34-844d-1d3ef06d446b" /mnt
+
+[root@localhost user1]# lsblk
+NAME          MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+sr0            11:0    1 167.3M  0 rom  /run/media/user1/CDROM
+sr1            11:1    1  11.9G  0 rom  /run/media/user1/RHEL-9-6-0-BaseOS-x86_64
+nvme0n1       259:0    0    60G  0 disk 
+├─nvme0n1p1   259:1    0   600M  0 part /boot/efi
+├─nvme0n1p2   259:2    0     1G  0 part /boot
+└─nvme0n1p3   259:3    0  58.4G  0 part 
+  ├─rhel-root 253:0    0  37.9G  0 lvm  /
+  ├─rhel-swap 253:1    0     2G  0 lvm  [SWAP]
+  └─rhel-home 253:2    0  18.5G  0 lvm  /home
+nvme0n2       259:4    0    10G  0 disk 
+└─nvme0n2p1   259:5    0   2.5G  0 part /mnt
+
+# Make Persistent
+
+sudo mkdir /data
+
+sudo vim /etc/fstab # fstab -> filesystem tables
+
+UUID=58187d3a-aaa8-4c34-844d-1d3ef06d446b /data xfs     defaults        0 0
+
+# if the filesystem type ext4 than 0 1
+
+root@localhost /]# sudo mount -a
+mount: (hint) your fstab has been modified, but systemd still uses
+       the old version; use 'systemctl daemon-reload' to reload.
+[root@localhost /]# systemctl daemon-reload
+[root@localhost /]# sudo mount -a
+
+[root@localhost /]# lsblk
+NAME          MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+sr0            11:0    1 167.3M  0 rom  /run/media/user1/CDROM
+sr1            11:1    1  11.9G  0 rom  /run/media/user1/RHEL-9-6-0-BaseOS-x86_64
+nvme0n1       259:0    0    60G  0 disk 
+├─nvme0n1p1   259:1    0   600M  0 part /boot/efi
+├─nvme0n1p2   259:2    0     1G  0 part /boot
+└─nvme0n1p3   259:3    0  58.4G  0 part 
+  ├─rhel-root 253:0    0  37.9G  0 lvm  /
+  ├─rhel-swap 253:1    0     2G  0 lvm  [SWAP]
+  └─rhel-home 253:2    0  18.5G  0 lvm  /home
+nvme0n2       259:4    0    10G  0 disk 
+└─nvme0n2p1   259:5    0   2.5G  0 part /data
+
+````
 
