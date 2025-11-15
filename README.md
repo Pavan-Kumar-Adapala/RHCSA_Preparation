@@ -2348,6 +2348,7 @@ nvme0n1       259:0    0    60G  0 disk
 nvme0n2       259:4    0    10G  0 disk 
 
 ````
+Steps overview:
 
 * Created a new DOS disklabel 
 
@@ -2356,7 +2357,10 @@ nvme0n2       259:4    0    10G  0 disk
     - Size
     - Sector details
 
+````bash
 sudo parted /dev/nvme0n2 mklabel msdos mkpart primary 0% 25%
+````
+
 
 ````bash
 [root@localhost user1]# sudo parted /dev/nvme0n2 mklabel msdos
@@ -2414,11 +2418,14 @@ or
 
 sudo mount PARTLABEL=<partlabel> /mnt
 
+
 How to check the Disk partition label?
 
+````bash
 lsblk -o name,mountpoint,label,size,uuid
 
 sudo fdisk -l
+````
 
 mount -t xfs
 
@@ -2435,6 +2442,8 @@ naming   =version 2              bsize=4096   ascii-ci=0, ftype=1
 log      =internal log           bsize=4096   blocks=16384, version=2
          =                       sectsz=512   sunit=0 blks, lazy-count=1
 realtime =none                   extsz=4096   blocks=0, rtextents=0
+
+# Mounting using Filesystem LABEL
 [root@localhost user1]# sudo mount LABEL=DATA /mnt
 [root@localhost user1]# lsblk
 NAME          MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
@@ -2449,6 +2458,8 @@ nvme0n1       259:0    0    60G  0 disk
   └─rhel-home 253:2    0  18.5G  0 lvm  /home
 nvme0n2       259:4    0    10G  0 disk 
 └─nvme0n2p1   259:5    0   2.5G  0 part /mnt
+
+# Unmount
 [root@localhost user1]# sudo umount /mnt
 [root@localhost user1]# lsblk
 NAME          MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
@@ -2464,7 +2475,7 @@ nvme0n1       259:0    0    60G  0 disk
 nvme0n2       259:4    0    10G  0 disk 
 └─nvme0n2p1   259:5    0   2.5G  0 part 
 
-# Using Filesystem UUID
+# Mounting using Filesystem UUID
 
 [root@localhost user1]# sudo blkid /dev/nvme0n2p1
 /dev/nvme0n2p1: LABEL="DATA" UUID="58187d3a-aaa8-4c34-844d-1d3ef06d446b" TYPE="xfs" PARTUUID="24bd0e25-01"
@@ -2516,4 +2527,482 @@ nvme0n2       259:4    0    10G  0 disk
 └─nvme0n2p1   259:5    0   2.5G  0 part /data
 
 ````
+
+### Creating Dynamic Disks using LVM2
+
+- Persisting Loop Devices
+- Understanding LVM
+- Configuring the LVM system
+- Configuring storage layers (LVM)
+- Managing volume groups and volumes
+
+
+
+#### Persisting Loop Devices
+
+We already touched the Loop Devices topic. These are additional disks setup from the files, ISO images ...
+
+One problem:
+
+These loop devices are not persistant, when we reboot the system the loop device is not exist anymore. Once again need use **losetup** command. But the file or ISO image... exist inside the system, just need to link the loop device to file or ISO.
+
+Solution:
+
+1. Manual approach using CLI command after reboot the system
+    
+    - sudo losetup # for linking
+    - sudo partprobe # read partition tables from the loop device and load into the memory
+
+2. Automating using systemd unit file, [automatically execute during boot process, so it available]
+
+losetup.service
+
+````
+    [Unit]
+    Description=Setup loop device
+    DefaultDependencies=no
+    Before=local-fs.target
+    After=systemd-udevd.service
+    Required=systemd-udevd.service
+
+    [Service]
+    Type=oneshot
+    ExecStart=/sbin/losetup /dev/loop1 /var/disks/sidk1
+    ExecStart=/sbin/partprobe /dev/loop1
+    TimeourSec=60
+    RemainAfterExit=no
+
+    [Install]
+    WantedBy=local-fs.target
+````
+
+sudo systemctl daemon-reload
+
+sudo systemctl enable losetup
+
+sudo reboot
+
+lsblk # check the loop device exist or not
+
+
+#### About LVM, Storage layers
+
+**Logical Volume Management:**
+
+Aggregating block storage to re-allocate as required/needed in the form of (Logical volumes) device-mapper volumes.
+
+List LVM:
+
+lsblk
+
+List Device-mapper devices:
+
+````bash
+sudo dmsetup ls --tree
+````
+
+**LVM2 Storage Layers**
+
+3 Layers
+
+- Logical volumes: Dev-mapper devices which are formatted and presented to the consumer as a block device
+
+- Volume groups: Volume groups acts as storage pool, aggregating storage together and overcoming the limitations of physical storage size
+
+- Physical volumes: Physical storage existing on the host as disks, partitions, and raw files
+
+
+**Managing LVM**
+
+Physical volumes - pvs, pvremove, pvcreate
+
+Volume groups - vgcreate, vgs, vgdisplay
+
+Logical volumes - lvs, lvcreate, lvresize
+
+
+
+#### Configuring the LVM system, storage layers (LVM), and Managing volume groups and volumes
+
+I have second disk in my VM
+
+````
+nvme0n2       259:4    0    10G  0 disk 
+└─nvme0n2p1   259:5    0   2.5G  0 part /data
+````
+nvme0n2p1 is the 1st partition and created XFS filesystem and added the Filesystem UUID in /etc/fstab for mount persistant.
+
+
+````
+sudo parted /dev/nvme0n2 mklabel msdos
+
+sudo parted /dev/nvme0n2 mkpart primary 0% 25%
+
+sudo blkid /dev/nvme0n2p1
+
+sudo mkdir /data
+
+sudo vim /etc/fstab
+
+UUID=58187d3a-aaa8-4c34-844d-1d3ef06d446b /data xfs     defaults        0 0
+
+# if the filesystem type ext4 than 0 1
+
+sudo mount -a
+
+systemctl daemon-reload
+
+lsblk
+````
+
+Now, Creating **Partitions** by specifing type as LVM **Mark partitions as LVM type**:
+
+````bash
+sudo parted /dev/nvme0n2 mkpart primary 25% 50% set 2 lvm on
+
+sudo parted /dev/nvme0n2 mkpart primary 50% 75% set 3 lvm on
+````
+
+````bash
+
+# The current status
+
+[user1@localhost var]$ lsblk
+NAME          MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+sr0            11:0    1 167.3M  0 rom  /run/media/user1/CDROM
+sr1            11:1    1  11.9G  0 rom  /run/media/user1/RHEL-9-6-0-BaseOS-x86_64
+nvme0n1       259:0    0    60G  0 disk 
+├─nvme0n1p1   259:1    0   600M  0 part /boot/efi
+├─nvme0n1p2   259:2    0     1G  0 part /boot
+└─nvme0n1p3   259:3    0  58.4G  0 part 
+  ├─rhel-root 253:0    0  37.9G  0 lvm  /
+  ├─rhel-swap 253:1    0     2G  0 lvm  [SWAP]
+  └─rhel-home 253:2    0  18.5G  0 lvm  /home
+nvme0n2       259:4    0    10G  0 disk 
+└─nvme0n2p1   259:5    0   2.5G  0 part /data
+
+[user1@localhost var]$ sudo parted /dev/nvme0n2 print
+[sudo] password for user1: 
+Model: VMware Virtual NVMe Disk (nvme)
+Disk /dev/nvme0n2: 10.7GB
+Sector size (logical/physical): 512B/512B
+Partition Table: msdos
+Disk Flags: 
+
+Number  Start   End     Size    Type     File system  Flags
+ 1      1049kB  2684MB  2683MB  primary  xfs
+
+
+# New partitions
+
+[user1@localhost ~]$ sudo parted /dev/nvme0n2 mkpart primary 25% 50% set 2 lvm on
+Information: You may need to update /etc/fstab.
+
+[user1@localhost ~]$ sudo parted /dev/nvme0n2 mkpart primary 50% 75% set 3 lvm on
+Information: You may need to update /etc/fstab.
+
+[user1@localhost ~]$ sudo parted /dev/nvme0n2 print                       
+Model: VMware Virtual NVMe Disk (nvme)
+Disk /dev/nvme0n2: 10.7GB
+Sector size (logical/physical): 512B/512B
+Partition Table: msdos
+Disk Flags: 
+
+Number  Start   End     Size    Type     File system  Flags
+ 1      1049kB  2684MB  2683MB  primary  xfs
+ 2      2684MB  5369MB  2684MB  primary               lvm
+ 3      5369MB  8053MB  2684MB  primary               lvm
+
+[user1@localhost ~]$ lsblk
+NAME          MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+sr0            11:0    1 167.3M  0 rom  /run/media/user1/CDROM
+sr1            11:1    1  11.9G  0 rom  /run/media/user1/RHEL-9-6-0-BaseOS-x86_64
+nvme0n1       259:0    0    60G  0 disk 
+├─nvme0n1p1   259:1    0   600M  0 part /boot/efi
+├─nvme0n1p2   259:2    0     1G  0 part /boot
+└─nvme0n1p3   259:3    0  58.4G  0 part 
+  ├─rhel-root 253:0    0  37.9G  0 lvm  /
+  ├─rhel-swap 253:1    0     2G  0 lvm  [SWAP]
+  └─rhel-home 253:2    0  18.5G  0 lvm  /home
+nvme0n2       259:4    0    10G  0 disk 
+├─nvme0n2p1   259:5    0   2.5G  0 part /data
+├─nvme0n2p2   259:6    0   2.5G  0 part 
+└─nvme0n2p3   259:7    0   2.5G  0 part 
+````
+
+**Creating LVM System, Volumes**
+
+[user1@localhost ~]$ sudo pvs
+  PV             VG   Fmt  Attr PSize  PFree
+  /dev/nvme0n1p3 rhel lvm2 a--  58.41g    0 
+
+[user1@localhost ~]$ sudo vgs
+  VG   #PV #LV #SN Attr   VSize  VFree
+  rhel   1   3   0 wz--n- 58.41g    0 
+
+[user1@localhost ~]$ sudo lvs
+  LV   VG   Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  home rhel -wi-ao----  18.50g                                                    
+  root rhel -wi-ao---- <37.90g                                                    
+  swap rhel -wi-ao----   2.01g      
+
+sudo vgcreate vg2 /dev/nvme0n2p2 # Creating Volume group and physical voulme using single command
+
+sudo pvs /dev/nvme0n2p2
+
+sudo vgs /dev/nvme0n2p2
+
+sudo lvs /dev/nvme0n2p2
+
+sudo lvcreate -n vg2lv2 -L1G vg2
+
+
+````bash                                          
+[user1@localhost ~]$ sudo vgcreate vg2 /dev/nvme0n2p2
+[sudo] password for user1: 
+  Physical volume "/dev/nvme0n2p2" successfully created.
+  Volume group "vg2" successfully created
+
+[user1@localhost ~]$ sudo pvs
+  PV             VG   Fmt  Attr PSize  PFree 
+  /dev/nvme0n1p3 rhel lvm2 a--  58.41g     0 
+  /dev/nvme0n2p2 vg2  lvm2 a--  <2.50g <2.50g
+
+[user1@localhost ~]$ sudo vgs
+  VG   #PV #LV #SN Attr   VSize  VFree 
+  rhel   1   3   0 wz--n- 58.41g     0 
+  vg2    1   0   0 wz--n- <2.50g <2.50g
+
+[user1@localhost ~]$ sudo lvs
+  LV   VG   Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  home rhel -wi-ao----  18.50g                                                    
+  root rhel -wi-ao---- <37.90g                                                    
+  swap rhel -wi-ao----   2.01g                                                    
+
+[user1@localhost ~]$ lsblk
+NAME          MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+sr0            11:0    1 167.3M  0 rom  /run/media/user1/CDROM
+sr1            11:1    1  11.9G  0 rom  /run/media/user1/RHEL-9-6-0-BaseOS-x86_64
+nvme0n1       259:0    0    60G  0 disk 
+├─nvme0n1p1   259:1    0   600M  0 part /boot/efi
+├─nvme0n1p2   259:2    0     1G  0 part /boot
+└─nvme0n1p3   259:3    0  58.4G  0 part 
+  ├─rhel-root 253:0    0  37.9G  0 lvm  /
+  ├─rhel-swap 253:1    0     2G  0 lvm  [SWAP]
+  └─rhel-home 253:2    0  18.5G  0 lvm  /home
+nvme0n2       259:4    0    10G  0 disk 
+├─nvme0n2p1   259:5    0   2.5G  0 part /data
+├─nvme0n2p2   259:6    0   2.5G  0 part 
+└─nvme0n2p3   259:7    0   2.5G  0 part 
+
+[user1@localhost ~]$ sudo lvcreate -n vg2lv2 -L1G vg2
+  Logical volume "vg2lv2" created.
+
+[user1@localhost ~]$ sudo lvs
+  LV     VG   Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  home   rhel -wi-ao----  18.50g                                                    
+  root   rhel -wi-ao---- <37.90g                                                    
+  swap   rhel -wi-ao----   2.01g                                                    
+  vg2lv2 vg2  -wi-a-----   1.00g                                                    
+
+[user1@localhost ~]$ sudo lvcreate -n vg2lv3 -L1G vg2
+  Logical volume "vg2lv3" created.
+
+[user1@localhost ~]$ lsblk
+NAME           MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+sr0             11:0    1 167.3M  0 rom  /run/media/user1/CDROM
+sr1             11:1    1  11.9G  0 rom  /run/media/user1/RHEL-9-6-0-BaseOS-x86_64
+nvme0n1        259:0    0    60G  0 disk 
+├─nvme0n1p1    259:1    0   600M  0 part /boot/efi
+├─nvme0n1p2    259:2    0     1G  0 part /boot
+└─nvme0n1p3    259:3    0  58.4G  0 part 
+  ├─rhel-root  253:0    0  37.9G  0 lvm  /
+  ├─rhel-swap  253:1    0     2G  0 lvm  [SWAP]
+  └─rhel-home  253:2    0  18.5G  0 lvm  /home
+nvme0n2        259:4    0    10G  0 disk 
+├─nvme0n2p1    259:5    0   2.5G  0 part /data
+├─nvme0n2p2    259:6    0   2.5G  0 part 
+│ ├─vg2-vg2lv2 253:3    0     1G  0 lvm  
+│ └─vg2-vg2lv3 253:4    0     1G  0 lvm  
+└─nvme0n2p3    259:7    0   2.5G  0 part 
+````
+
+**Creating Volume group using 2 Partitions (PVs)**
+
+````bash
+[user1@localhost ~]$ sudo vgcreate vg23 /dev/nvme0n2p2 /dev/nvme0n2p3
+  Physical volume "/dev/nvme0n2p3" successfully created.
+  Volume group "vg23" successfully created
+
+[user1@localhost ~]$ sudo pvs
+  PV             VG   Fmt  Attr PSize  PFree 
+  /dev/nvme0n1p3 rhel lvm2 a--  58.41g     0 
+  /dev/nvme0n2p2 vg23 lvm2 a--  <2.50g <2.50g
+  /dev/nvme0n2p3 vg23 lvm2 a--  <2.50g <2.50g
+
+[user1@localhost ~]$ sudo vgs
+  VG   #PV #LV #SN Attr   VSize  VFree
+  rhel   1   3   0 wz--n- 58.41g    0 
+  vg23   2   0   0 wz--n-  4.99g 4.99g
+
+[user1@localhost ~]$ sudo lvs
+  LV   VG   Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  home rhel -wi-ao----  18.50g                                                    
+  root rhel -wi-ao---- <37.90g                                                    
+  swap rhel -wi-ao----   2.01g   
+
+[user1@localhost ~]$ sudo lvcreate -n lv23 -L1G vg23
+  Logical volume "lv23" created.
+
+[user1@localhost ~]$ sudo lvs
+  LV   VG   Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  home rhel -wi-ao----  18.50g                                                    
+  root rhel -wi-ao---- <37.90g                                                    
+  swap rhel -wi-ao----   2.01g                                                    
+  lv23 vg23 -wi-a-----   1.00g                                                    
+
+[user1@localhost ~]$ lsblk
+NAME          MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+sr0            11:0    1 167.3M  0 rom  /run/media/user1/CDROM
+sr1            11:1    1  11.9G  0 rom  /run/media/user1/RHEL-9-6-0-BaseOS-x86_64
+nvme0n1       259:0    0    60G  0 disk 
+├─nvme0n1p1   259:1    0   600M  0 part /boot/efi
+├─nvme0n1p2   259:2    0     1G  0 part /boot
+└─nvme0n1p3   259:3    0  58.4G  0 part 
+  ├─rhel-root 253:0    0  37.9G  0 lvm  /
+  ├─rhel-swap 253:1    0     2G  0 lvm  [SWAP]
+  └─rhel-home 253:2    0  18.5G  0 lvm  /home
+nvme0n2       259:4    0    10G  0 disk 
+├─nvme0n2p1   259:5    0   2.5G  0 part /data
+├─nvme0n2p2   259:6    0   2.5G  0 part 
+│ └─vg23-lv23 253:3    0     1G  0 lvm  
+└─nvme0n2p3   259:7    0   2.5G  0 part 
+
+
+[user1@localhost ~]$ sudo lvcreate -n lv24 -L1G vg23
+  Logical volume "lv24" created.
+[user1@localhost ~]$ sudo lvs
+  LV   VG   Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  home rhel -wi-ao----  18.50g                                                    
+  root rhel -wi-ao---- <37.90g                                                    
+  swap rhel -wi-ao----   2.01g                                                    
+  lv23 vg23 -wi-a-----   1.00g                                                    
+  lv24 vg23 -wi-a-----   1.00g                                                    
+[user1@localhost ~]$ lsblk
+NAME          MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+sr0            11:0    1 167.3M  0 rom  /run/media/user1/CDROM
+sr1            11:1    1  11.9G  0 rom  /run/media/user1/RHEL-9-6-0-BaseOS-x86_64
+nvme0n1       259:0    0    60G  0 disk 
+├─nvme0n1p1   259:1    0   600M  0 part /boot/efi
+├─nvme0n1p2   259:2    0     1G  0 part /boot
+└─nvme0n1p3   259:3    0  58.4G  0 part 
+  ├─rhel-root 253:0    0  37.9G  0 lvm  /
+  ├─rhel-swap 253:1    0     2G  0 lvm  [SWAP]
+  └─rhel-home 253:2    0  18.5G  0 lvm  /home
+nvme0n2       259:4    0    10G  0 disk 
+├─nvme0n2p1   259:5    0   2.5G  0 part /data
+├─nvme0n2p2   259:6    0   2.5G  0 part 
+│ ├─vg23-lv23 253:3    0     1G  0 lvm  
+│ └─vg23-lv24 253:4    0     1G  0 lvm  
+└─nvme0n2p3   259:7    0   2.5G  0 part 
+
+
+[user1@localhost ~]$ sudo lvcreate -n lv25 -L1G vg23
+  Logical volume "lv25" created.
+[user1@localhost ~]$ sudo lvs
+  LV   VG   Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  home rhel -wi-ao----  18.50g                                                    
+  root rhel -wi-ao---- <37.90g                                                    
+  swap rhel -wi-ao----   2.01g                                                    
+  lv23 vg23 -wi-a-----   1.00g                                                    
+  lv24 vg23 -wi-a-----   1.00g                                                    
+  lv25 vg23 -wi-a-----   1.00g                                                    
+[user1@localhost ~]$ lsblk
+NAME          MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+sr0            11:0    1 167.3M  0 rom  /run/media/user1/CDROM
+sr1            11:1    1  11.9G  0 rom  /run/media/user1/RHEL-9-6-0-BaseOS-x86_64
+nvme0n1       259:0    0    60G  0 disk 
+├─nvme0n1p1   259:1    0   600M  0 part /boot/efi
+├─nvme0n1p2   259:2    0     1G  0 part /boot
+└─nvme0n1p3   259:3    0  58.4G  0 part 
+  ├─rhel-root 253:0    0  37.9G  0 lvm  /
+  ├─rhel-swap 253:1    0     2G  0 lvm  [SWAP]
+  └─rhel-home 253:2    0  18.5G  0 lvm  /home
+nvme0n2       259:4    0    10G  0 disk 
+├─nvme0n2p1   259:5    0   2.5G  0 part /data
+├─nvme0n2p2   259:6    0   2.5G  0 part 
+│ ├─vg23-lv23 253:3    0     1G  0 lvm  
+│ └─vg23-lv24 253:4    0     1G  0 lvm  
+└─nvme0n2p3   259:7    0   2.5G  0 part 
+  └─vg23-lv25 253:5    0     1G  0 lvm  
+````
+
+#### Dynamically expanding Logical voulmes
+
+Extending logical volumes (LVs) is most advantages. The extension is possible, if the Volume group (VG) has free space. If VG is full, than add another Physical disk and create (PV).
+
+To extend Volume Group:
+
+vgextend 
+
+To extend Logical volume:
+
+lvextend
+
+To extend Filesystem created on LV:
+
+lvextend -r 
+    
+    -r option used to resize ext4 or xfs filesystem and respective logical volume
+
+
+How to change volume group Attr?
+
+sudo vgchange -a y <VG name>  # y for yes
+
+
+Make filesystem?
+
+mkfs.xfs </dev/VGname/LVname>
+
+or
+
+mkfs.xfs </dev/mapper/VGname-LVname>
+
+LVM:
+
+lvextend -r -l +100%FREE <VGname/LVname>
+
+or
+
+lvextend -r -L +100M <VGname/LVname>
+
+
+vgextend -v <VGname> <new_partition (/dev/nvme0n2p4)>
+
+
+**Virtual memory / Swap space**
+
+swapon -s
+
+lvcreate -n <swaplogicalvolume> -L +500m <VGname>
+
+Adding Swap header:
+
+mkswap </dev/VGname/swaplogicalvolume>
+
+
+swapon -p 10 </dev/VGname/swaplogicalvolume> # p is priority (high value more priority - used)
+
+swapon -s
+
+swapoff -a
+
+Add the below record in **/etc/fstab**
+
+</dev/VGname/swaplogicalvolume>  swap pri=3 0 0
+
+swapon -a
+
+swapon -s
 
