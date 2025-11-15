@@ -2732,6 +2732,7 @@ nvme0n2       259:4    0    10G  0 disk
 
 **Creating LVM System, Volumes**
 
+````bash
 [user1@localhost ~]$ sudo pvs
   PV             VG   Fmt  Attr PSize  PFree
   /dev/nvme0n1p3 rhel lvm2 a--  58.41g    0 
@@ -2755,7 +2756,7 @@ sudo vgs /dev/nvme0n2p2
 sudo lvs /dev/nvme0n2p2
 
 sudo lvcreate -n vg2lv2 -L1G vg2
-
+````
 
 ````bash                                          
 [user1@localhost ~]$ sudo vgcreate vg2 /dev/nvme0n2p2
