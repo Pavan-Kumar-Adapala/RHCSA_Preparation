@@ -69,6 +69,7 @@ sudo groupmod -a -U <username> <group-name>
 ### About sudo
 
 sudo -> used to elevated previliages of current user
+
 sudo yum install -y bash-completion
 
 Note:
@@ -77,6 +78,7 @@ The sudo command allows permitted users to execute commands as another user, typ
 Configurations are managed in **/etc/sudoers or under /etc/sudoers.d/**.
 
 You should never edit /etc/sudoers directly; instead use:
+
     sudo visudo
     
     
@@ -103,11 +105,15 @@ Question:
 Create a user named **devops** who can restart the httpd service using sudo but cannot run any other privileged command.
 
 Create user
+
     sudo useradd -m devops
+
     sudo passwd devops
+
     # enter the password
 
 Check the httpd service is installed
+
     sudo systemctl status httpd || sudo yum install -y httpd
     
     sudo systemctl status httpd
@@ -117,6 +123,7 @@ Check the httpd service is installed
     sudo systemctl enable httpd
     
     Check the user and group:
+
     -rw-r--r--.  1 root root   963 Jul 28 18:24 httpd.service
     
 Create a sudoers policy file for the user
@@ -147,12 +154,15 @@ Testing
     
     
     [devops@localhost ~]$ sudo cat /etc/shadow
+
     [sudo] password for devops: 
+
     Sorry, user devops is not allowed to execute '/bin/cat /etc/shadow' as root on localhost.localdomain.
 
     
     
 Simllar questions:
+
 1. Create a user named backup who can mount and unmount the device /dev/sdb1 on /mnt/backup using sudo, but cannot mount or unmount anything else.
     
     backup ALL=(ALL) NOPASSWD: /usr/bin/mount /dev/sdb1 /mnt/backup, /usr/bin/umount /mnt/backup
@@ -373,10 +383,13 @@ Examples:
 (Heredoc) is a type of redirection that allows you to pass multiple lines of input to a command — great for scripting.
 
 Example:
+
+````bash
 cat > file1 << EOF
 Line 1
 Line 2
 EOF
+````
 
 Note:
 << EOF means: read input until the word EOF appears again.
@@ -405,10 +418,13 @@ tee -a → append
 
 
 example:
+
+````bash
 cat << EOF | sudo tee /etc/motd
 Welcome to the server!
 Authorized access only.
 EOF
+````
 
 note: This uses both heredoc and tee for a privileged write.
 
@@ -806,10 +822,10 @@ Answer:
     - It turns red or flashing (depending on your terminal theme)
 
     Access fails:
-````bash
+
         cat softlink1
+
         cat: softlink1: No such file or directory
-````
 
 Question:
 
@@ -926,7 +942,9 @@ touch file1
 ls -l file1
 
 newgrp wheel # opens new shell
+
 or
+
 sg wheel
 
 touch file 2
@@ -975,7 +993,6 @@ developer : devteam wheel
 
 [user1@localhost ~]$ id developer
 uid=1003(developer) gid=1003(devteam) groups=1003(devteam),10(wheel)
-
 ````
 ---
 
@@ -3006,4 +3023,237 @@ Add the below record in **/etc/fstab**
 swapon -a
 
 swapon -s
+
+
+
+## Module 05 - Creating and Configuring FileSystems
+
+- Creating and managing filesystems
+- Special filesystem permissions for Collaborative 
+- Implementing VDO
+- Simplifed volumes using Stratis
+
+
+### Creating and manage Local filesystems
+
+- Creating filesystems using (mkfs)
+- Read and manage filesystem metadata
+- Create and secure mountpoints and mount filesystems
+- Extend logical volumes
+
+
+````bash
+[user1@localhost ~]$ lsblk
+NAME          MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+sr0            11:0    1 167.3M  0 rom  /run/media/user1/CDROM
+sr1            11:1    1  11.9G  0 rom  /run/media/user1/RHEL-9-6-0-BaseOS-x86_64
+nvme0n1       259:0    0    60G  0 disk 
+├─nvme0n1p1   259:1    0   600M  0 part /boot/efi
+├─nvme0n1p2   259:2    0     1G  0 part /boot
+└─nvme0n1p3   259:3    0  58.4G  0 part 
+  ├─rhel-root 253:0    0  37.9G  0 lvm  /
+  ├─rhel-swap 253:1    0     2G  0 lvm  [SWAP]
+  └─rhel-home 253:2    0  18.5G  0 lvm  /home
+nvme0n2       259:4    0    10G  0 disk 
+├─nvme0n2p1   259:5    0   2.5G  0 part /data
+├─nvme0n2p2   259:6    0   2.5G  0 part 
+│ ├─vg23-lv23 253:3    0     1G  0 lvm  
+│ └─vg23-lv24 253:4    0     1G  0 lvm  
+└─nvme0n2p3   259:7    0   2.5G  0 part 
+  └─vg23-lv25 253:5    0     1G  0 lvm  
+
+# See filesystem info
+[user1@localhost ~]$ lsblk -f
+NAME          FSTYPE      FSVER            LABEL                    UUID                                   FSAVAIL FSUSE% MOUNTPOINTS
+sr0           iso9660                      CDROM                    2025-11-09-15-43-20-00                       0   100% /run/media/user1/CDROM
+sr1           iso9660     Joliet Extension RHEL-9-6-0-BaseOS-x86_64 2025-04-08-23-13-43-00                       0   100% /run/media/user1/RHEL-9-6-0-BaseOS-x86_64
+nvme0n1                                                                                                                   
+├─nvme0n1p1   vfat        FAT32                                     9FAF-324C                               591.8M     1% /boot/efi
+├─nvme0n1p2   xfs                                                   2cb4ec9f-7d8e-4269-836b-7639df723ba4    603.5M    37% /boot
+└─nvme0n1p3   LVM2_member LVM2 001                                  m4GEPW-pZ4s-GPEf-NoNK-sxlq-HzrQ-MANXoC                
+  ├─rhel-root xfs                                                   eda35ef0-e7dd-4f9d-835a-7372e55c0207     33.3G    12% /
+  ├─rhel-swap swap        1                                         3e536219-7157-40f3-bc18-16139ed667cd                  [SWAP]
+  └─rhel-home xfs                                                   6c8f2a47-daa9-441e-8828-916f50aca550     18.3G     1% /home
+nvme0n2                                                                                                                   
+├─nvme0n2p1   xfs                          DATA                     58187d3a-aaa8-4c34-844d-1d3ef06d446b      2.4G     2% /data
+├─nvme0n2p2   LVM2_member LVM2 001                                  UG7KMn-Viz6-ptSM-97m3-aRIQ-PnrW-ki03rR                
+│ ├─vg23-lv23 xfs                                                   ec3d9d62-e1e9-4d85-aa9f-07b9df5bb357                  
+│ └─vg23-lv24                                                                                                             
+└─nvme0n2p3   LVM2_member LVM2 001                                  SPtmLj-tWYr-Sd06-x4fm-1pL3-5C5m-eD4EYw                
+  └─vg23-lv25        
+
+# Read metadata check isize and bsize
+[user1@localhost ~]$ sudo xfs_info /dev/nvme0n2p1
+meta-data=/dev/nvme0n2p1         isize=512    agcount=4, agsize=163776 blks
+         =                       sectsz=512   attr=2, projid32bit=1
+         =                       crc=1        finobt=1, sparse=1, rmapbt=0
+         =                       reflink=1    bigtime=1 inobtcount=1 nrext64=0
+data     =                       bsize=4096   blocks=655104, imaxpct=25
+         =                       sunit=0      swidth=0 blks
+naming   =version 2              bsize=4096   ascii-ci=0, ftype=1
+log      =internal log           bsize=4096   blocks=16384, version=2
+         =                       sectsz=512   sunit=0 blks, lazy-count=1
+realtime =none                   extsz=4096   blocks=0, rtextents=0
+
+# print label, use -L set set Label (if label not available)
+[user1@localhost ~]$ sudo xfs_admin -l /dev/nvme0n2p1
+label = "DATA"
+
+# read UUID
+[user1@localhost ~]$ sudo xfs_admin -u /dev/nvme0n2p1
+UUID = 58187d3a-aaa8-4c34-844d-1d3ef06d446b
+                                                                                                     
+````
+
+**EXT4**
+
+The below are the most common filesystem types in Linux distributions:
+
+xfs
+
+ext4
+
+````bash
+mkfs.xfs <PartitionName or DiskName>
+
+mkfs.ext4 <PartitionName or DiskName>
+
+# Reading ext4 file metadata
+sudo dumpe2fs /dev/<partitionname>
+
+# Create Label, incase forgot while mkfs time
+sudo tune2fs -L "<labelname>" /dev/<partitionname>  
+````
+
+Note:
+
+Important Options - Avoid Unwanted filesystem checks
+
+- Check interval: The internal between filesystem checks. the filesystem interval will always expire when you need the system the quickest
+
+- Maximum mount count: When the filesystem reaches the max count value the filesystem is automatically checked on boot
+
+
+
+**Securing Mount Points**
+
+Before mounting the disk/disk partition to the directory (ex: /data) in the root Filesystem (/) is not accessable to the users except root. so
+
+mkdir /data # **this a directory inside the root filesystem, so root user only need to access the directory until mount to partition/disk**
+
+Before mount the directory permissions:
+
+sudo chmod -v 700 /data
+
+After mount:
+
+sudo chmod -v 707 /data # its depended on the our usecase
+
+
+The real magic is:
+
+when you **umoumt** and try to access the /data, then you will get **permission error**. Automatically inherit the permissions depend on the mount status.
+
+sudo umount /data
+
+sudo ls -l /
+
+drwx------.   2 root root    6 Nov 14 18:37 data     # 700
+
+cd /data # permission error
+
+sudo mount <partitionfullpath> /data
+
+sudo ls -l /
+
+````bash
+[user1@localhost ~]$ sudo mount /dev/nvme0n2p1 /data
+
+[user1@localhost ~]$ ls -l /
+
+drwx---rwx.   2 root root    6 Nov 14 18:25 data  # 707
+````
+
+Example:
+
+````bash
+[user1@localhost ~]$ lsblk
+NAME          MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+sr0            11:0    1 167.3M  0 rom  /run/media/user1/CDROM
+sr1            11:1    1  11.9G  0 rom  /run/media/user1/RHEL-9-6-0-BaseOS-x86_64
+nvme0n1       259:0    0    60G  0 disk 
+├─nvme0n1p1   259:1    0   600M  0 part /boot/efi
+├─nvme0n1p2   259:2    0     1G  0 part /boot
+└─nvme0n1p3   259:3    0  58.4G  0 part 
+  ├─rhel-root 253:0    0  37.9G  0 lvm  /
+  ├─rhel-swap 253:1    0     2G  0 lvm  [SWAP]
+  └─rhel-home 253:2    0  18.5G  0 lvm  /home
+nvme0n2       259:4    0    10G  0 disk 
+├─nvme0n2p1   259:5    0   2.5G  0 part 
+├─nvme0n2p2   259:6    0   2.5G  0 part 
+│ ├─vg23-lv23 253:3    0     1G  0 lvm  
+│ └─vg23-lv24 253:4    0     1G  0 lvm  
+├─nvme0n2p3   259:7    0   2.5G  0 part 
+│ └─vg23-lv25 253:5    0     1G  0 lvm  
+└─nvme0n2p4   259:8    0   1.8G  0 part 
+
+# The directory permissions before mounting
+[user1@localhost ~]$ sudo chmod -v 700 /data
+mode of '/data' changed from 0755 (rwxr-xr-x) to 0700 (rwx------)
+
+# No one can"t access the directory except root
+[user1@localhost ~]$ cd /data
+bash: cd: /data: Permission denied
+
+# mount the disk to the mount point (directory)
+[user1@localhost ~]$ sudo mount /dev/nvme0n2p1 /data
+[user1@localhost ~]$ lsblk
+NAME          MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+sr0            11:0    1 167.3M  0 rom  /run/media/user1/CDROM
+sr1            11:1    1  11.9G  0 rom  /run/media/user1/RHEL-9-6-0-BaseOS-x86_64
+nvme0n1       259:0    0    60G  0 disk 
+├─nvme0n1p1   259:1    0   600M  0 part /boot/efi
+├─nvme0n1p2   259:2    0     1G  0 part /boot
+└─nvme0n1p3   259:3    0  58.4G  0 part 
+  ├─rhel-root 253:0    0  37.9G  0 lvm  /
+  ├─rhel-swap 253:1    0     2G  0 lvm  [SWAP]
+  └─rhel-home 253:2    0  18.5G  0 lvm  /home
+nvme0n2       259:4    0    10G  0 disk 
+├─nvme0n2p1   259:5    0   2.5G  0 part /data
+├─nvme0n2p2   259:6    0   2.5G  0 part 
+│ ├─vg23-lv23 253:3    0     1G  0 lvm  
+│ └─vg23-lv24 253:4    0     1G  0 lvm  
+├─nvme0n2p3   259:7    0   2.5G  0 part 
+│ └─vg23-lv25 253:5    0     1G  0 lvm  
+└─nvme0n2p4   259:8    0   1.8G  0 part 
+
+# Changing the permisions after mounting
+[user1@localhost ~]$ sudo chmod -v 707 /data
+mode of '/data' changed from 0755 (rwxr-xr-x) to 0707 (rwx---rwx)
+
+# Access checking
+[user1@localhost ~]$ cd /data
+[user1@localhost data]$ cd -
+/home/user1
+
+# Unmount and access checking
+[user1@localhost ~]$ sudo umount /data
+[user1@localhost ~]$ cd /data
+bash: cd: /data: Permission denied 
+````
+
+**Extending Logical Volumes**
+
+this topic already covered in the module 04 - Dynamically expanding Logical voulmes
+
+
+
+### Special filesystem permissions for Collaborative 
+
+#### Manage directory permissions for collaboration
+
+
+
+
+#### Sharing filesystems using NFS
 
