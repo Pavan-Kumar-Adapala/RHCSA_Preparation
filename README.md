@@ -928,8 +928,11 @@ Note: If the group details are not updated, than Logout and Login to see the cha
 sudo useradd -m alice
 sudo passwd alice
 
-# creating group
+# creating a new group
 sudo groupadd devops
+# Add user account to the group
+sudo gpasswd -a alice devops
+
 # adding user (alice) to group (devops)
 sudo usermod -aG devops alice
 ````
@@ -2080,7 +2083,7 @@ Device files are only for:
 
 ### Creating and partitioning Block Devices
 
-**Adding another disk to system**
+#### Adding another disk to system
 
 power off the VM in VMWare workstation -> go to VM settings -> select Hard Disk -> click **Add** -> Select **disk type** and **virtual or physical disk** -> ok
 
@@ -2115,7 +2118,7 @@ sudo losetup /dev/loop1 <disk file> # Attach loop1
 
 losetup -a # List loop devices
 
-sudo losetup -d /dev/loop0 # Delete or detach loop0
+sudo losetup -d /dev/loop1 # Delete or detach loop1
 
 sudo losetup -D # Detach all
 
@@ -2147,7 +2150,7 @@ nvme0n2       259:4    0    10G  0 disk
 ````
 
 
-**Disk Partition**
+#### Disk Partition
 
 To partition disk, first you should know about the **Patition tables**.
 
@@ -2403,7 +2406,7 @@ nvme0n2       259:4    0    10G  0 disk
 └─nvme0n2p1   259:5    0   2.5G  0 part 
 ````
 
-**Working with Filesystems**
+#### Working with Filesystems
 
 Above the disk is partitioned, to use the partition - we need to add a filesystem.
 
@@ -2423,7 +2426,7 @@ Demo:
 Adding a filesystem, we can mount the partition or entire disk using persistent names
 
 
-Make filesystem
+Make filesystem:
 
 sudo mkfs.xfs -L "DATA" /dev/nvme0n2p1
 
@@ -3028,11 +3031,7 @@ swapon -s
 
 ## Module 05 - Creating and Configuring FileSystems
 
-- Creating and managing filesystems
-- Special filesystem permissions for Collaborative 
-- Implementing VDO
-- Simplifed volumes using Stratis
-
+In Module 04, We already know about adding new disk and make partitions.
 
 ### Creating and manage Local filesystems
 
@@ -3109,9 +3108,8 @@ UUID = 58187d3a-aaa8-4c34-844d-1d3ef06d446b
 
 The below are the most common filesystem types in Linux distributions:
 
-xfs
-
-ext4
+- xfs
+- ext4
 
 ````bash
 mkfs.xfs <PartitionName or DiskName>
@@ -3137,9 +3135,9 @@ Important Options - Avoid Unwanted filesystem checks
 
 **Securing Mount Points**
 
-Before mounting the disk/disk partition to the directory (ex: /data) in the root Filesystem (/) is not accessable to the users except root. so
+Before mounting the disk or disk partition to the directory (ex: /data) in the root Filesystem (/) is not accessable to the users except root. so
 
-mkdir /data # **this a directory inside the root filesystem, so root user only need to access the directory until mount to partition/disk**
+sudo mkdir /data # **this a directory inside the root filesystem, so root user only need to access the directory until mount to disk partition or disk**
 
 Before mount the directory permissions:
 
@@ -3147,12 +3145,13 @@ sudo chmod -v 700 /data
 
 After mount:
 
-sudo chmod -v 707 /data # its depended on the our usecase
+mount <disk partition> /data
 
+sudo chmod -v 707 /data # its depended on the our usecase
 
 The real magic is:
 
-when you **umoumt** and try to access the /data, then you will get **permission error**. Automatically inherit the permissions depend on the mount status.
+when you **umoumt** and try to access the /data, then you will get **permission error**. Becuase, **Automatically inherit the permissions** depend on the mount status.
 
 sudo umount /data
 
@@ -3165,6 +3164,8 @@ cd /data # permission error
 sudo mount <partitionfullpath> /data
 
 sudo ls -l /
+
+cd /data # No error
 
 ````bash
 [user1@localhost ~]$ sudo mount /dev/nvme0n2p1 /data
@@ -3244,7 +3245,7 @@ bash: cd: /data: Permission denied
 
 **Extending Logical Volumes**
 
-this topic already covered in the module 04 - Dynamically expanding Logical voulmes
+This topic already covered in the module 04 - Dynamically expanding Logical voulmes
 
 
 
@@ -3252,8 +3253,514 @@ this topic already covered in the module 04 - Dynamically expanding Logical voul
 
 #### Manage directory permissions for collaboration
 
+**Special Permissions**
 
+stat -c %a /etc/hosts
+
+0644
+
+ s   u   g   o
+--- --- --- --- => 4 blocks * 3 bits = 12 bits
+
+
+We already know, 644 repersents the permissions of user, group, and others
+
+now, we are learning about **1st block** -> special permissions
+
+SUID - 4 - Used on programs to run as the user owner during execution
+
+SGID - 2 - On directories, new files are assigned the group owner from the directory
+
+Sticky Bit - 1 - With this set users can only delete files they own from shared directories
+
+````bash
+mkdir -p ~/prems/dir{1..4}
+
+chmod -v 1777 ~/prems/dir1 # Sticky bit set
+
+chmod -v 2777 ~/prems/dir2 # SGID bit set
+
+chmod -v 3777 ~/prems/dir3 # Both the sticky bit and SGID bit set
+
+chmod -v 1770 ~/prems/dir4 # Sticky bit is set but no permissions to others
+
+ls -l ~/prems
+
+(or) 
+
+find ~/prems/ -type d -perm /g=s, o=t # List dirs where either SGID or Sticky bit set
+
+type -> d for directories, f for regular files, l for linked files
+
+d -> for directories
+
+g (group) -> SGID
+
+o (others) -> t -> sticky
+
+/ -> either, - -> both
+
+find ~/prems/ -type d -perm -g=s, o=t # List dirs where both SGID or Sticky bit set 
+
+find ~/prems/ -type d -perm /o=t # List dirs where Sticky bit set 
+
+find ~/prems/ -type d -perm /o=tw # List dirs where Sticky bit set or world writable
+````
+
+**Sticky bit example:**
+
+sudo useradd -m user2
+
+sudo passwd
+
+sudo groupadd devops
+
+sudo gpasswd -a user2 devops
+
+su - user2 # switching the user
+
+sudo mkdir -p -m 700 /teams/devops # Before mounting, the root user only access the /teams/devops directory
+
+ls -ld /teams/devops
+
+sudo mount <ext4/xfs partition> /teams/devops or (mount -t ext4)
+
+ls -ld /teams/devops # Observe the group and user details
+
+cd /teams/devops
+
+sudo chgrp devops /teams/devops # changed the group on the directory  
+
+sudo chmod -v 770 /teams/devops # changed the directory permissions (technically the directory called as filesystem directory), after mounting
+
+touch file1 # the file owner is user2
+
+sudo touch root1 # the file owner is root
+
+ls -l
+
+rm * # the user2 to belong to **devops** group
+
+sudo chmod o+t /teams/devops # Special permission (sticky bit) added
+
+sudo touch root1 # the file owner is root
+
+touch file1 # the file owner is user2
+
+ls -l
+
+rm root1 # Error: operation not permitted, because sticky bit won't allow user2 to delete file. Because he is not the owner even though **user2 belong to devops group**.
+
+rm file1 # No Error, because user2 is the file owner
+
+su - user1
+
+cd /teams/devops # Are user1 able to access the directory? Ans: no
+
+**SGID**
+
+su - user2
+
+cd /teams/devops
+
+umask 007
+
+touch file1
+
+sudo touch root1
+
+ls -l file1
+
+sudo chmod -v g+s . # . -> /teams/devops
+
+touch file2
+
+ls -l
+
+**observe the user and group difference between file1 and file2**
+
+sudo -i # Switch to root user
+
+umask 007
+
+touch /teams/devops/root2
+
+exit
+
+ls -l /teams/devops
+
+**observe the user and group difference between root1 and root2**
 
 
 #### Sharing filesystems using NFS
+
+We can share the files using NFS protocol between client and server systems. 
+
++ Install nfs-utils in both server and client VMs
++ add nfs service in Firewall inbound rules
++ edit **/etc/exports** default configuration file or **/etc/exports.d/<customname>.exports**
+
+
+
+- **nfsconf** management tool that writes to the new **/etc/nfs.conf** configuration file.
+
+  nfsconf --set nfsd vers4 y # this command will modify in /etc/nfs.conf, y -> enable, n -> disable
+
+  nfsconf --set nfsd tcp y
+
+  nfsconf --set nfsd udp n
+
+  nfsconf --set nfsd vers3 n
+
+- managing the inbound connections using firewalld
+
+  firewall-cmd --state # status check
+
+  firewall-cmd --list-all
+
+  firewall-cmd --add-service=nfs
+
+  firewall-cmd --runtime-to-permanet
+
+Note: 
+
+For NFS, we need two VMs one act as **server** and other act as **client**. In both VMs we need to install **nfs-utils** package
+
+By default, Firewall **blocks the nfs service** on server VM. On the NFS server we can allow inbound **TCP port 2049 or NFS service** by making use of the NFS service XML file.
+
+````bash
+# Inside server VM
+
+# Check Open ports in VM before installing nfs-utils
+[user1@localhost ~]$ ss -ntl
+State         Recv-Q                       Send-Q                Local Address:Port                  Peer Address:Port                       
+LISTEN        0                            4096                     127.0.0.1:631                        0.0.0.0:*                          
+LISTEN        0                            128                      0.0.0.0:22                           0.0.0.0:*                          
+LISTEN        0                            4096                     [::1]:631                              [::]:*                          
+LISTEN        0                            128                      [::]:22                                [::]:*   
+
+
+
+# 01 - Install nfs-utils
+sudo yum install nfs-utils -y
+
+# Start and enable nfs service
+sudo systemctl enable --now nfs-server
+
+sudo systemctl status nfs-server
+
+# Check the allowed services in the firewall
+[user1@localhost ~]$ firewall-cmd --list-all
+public (active)
+  target: default
+  icmp-block-inversion: no
+  interfaces: ens160
+  sources: 
+  services: cockpit dhcpv6-client ssh
+  ports: 
+  protocols: 
+  forward: yes
+  masquerade: no
+  forward-ports: 
+  source-ports: 
+  icmp-blocks: 
+  rich rules: 
+
+# Check Open ports in VM after installing nfs-utils and starting the service
+root@localhost ~]# ss -ntl
+State                 Recv-Q                Send-Q                     Local Address:Port                    Peer Address:Port                      
+LISTEN                  0                    4096                        0.0.0.0:50085                            0.0.0.0:*                         
+LISTEN                  0                    4096                        0.0.0.0:20048                            0.0.0.0:*                         
+LISTEN                  0                    4096                        127.0.0.1:631                            0.0.0.0:*                         
+LISTEN                  0                    128                         0.0.0.0:22                               0.0.0.0:*                         
+LISTEN                  0                    4096                        0.0.0.0:2049                             0.0.0.0:*                         
+LISTEN                  0                    4096                        0.0.0.0:111                              0.0.0.0:*                         
+LISTEN                  0                    64                          0.0.0.0:41143                            0.0.0.0:*                         
+LISTEN                  0                    4096                          [::]:57223                               [::]:*                         
+LISTEN                  0                    4096                          [::]:20048                               [::]:*                         
+LISTEN                  0                    4096                          [::1]:631                                [::]:*                         
+LISTEN                  0                    64                            [::]:39321                               [::]:*                         
+LISTEN                  0                    128                           [::]:22                                  [::]:*                         
+LISTEN                  0                    4096                          [::]:2049                                [::]:*                         
+LISTEN                  0                    4096                          [::]:111                                 [::]:*        
+
+
+# 02 - add nfs service in firewall
+
+sudo firewall-cmd --list-all
+
+sudo firewall-cmd --permanent --add-service=nfs
+
+sudo firewall-cmd --list-all
+
+# 03 - /etc/exports.d/teams.exports
+
+# Creating shared filesystem
+sudo mkdir -p -m 700 /teams/devops # only root user access the directory
+
+# Adding files inside shared directory
+sudo find /usr/share/doc -name '*.pdf' -exec sudo cp {} /teams/devops \;
+
+sudo ls -l /teams/devops
+
+# Create the custom configuration file and enter
+sudo vim /etc/exports.d/teams.exports
+
+  /teams/devops 192.168.88.132/24(no_root_squash,rw,sync)
+  # shared directory <how will access the directory> <permission and sync>
+
+sudo exportfs -r
+
+[user1@localhost ~]$ sudo exportfs
+/teams/devops 	192.168.88.132/24
+
+
+
+# Inside Client VM
+
+# 01 - Install nfs-utils
+sudo yum install nfs-utils -y
+
+# Start and enable nfs service
+sudo systemctl enable --now nfs-server
+
+sudo systemctl status nfs-server
+
+# 02 - mount nfs to clent side filesystem
+
+sudo mount -t nfs4 192.168.88.132:/teams/devops /mnt
+
+sudo ls -l /mnt # check you are able to access the files
+
+
+## mount persistance
+
+- edit /etc/fstab
+
+  192.168.88.132:/teams/devops /mnt nfs defaults 0 0
+
+or 
+
+- autofs
+
+autofs service can mount these exports automatically for you when needed. 
+
+# Install autofs on client server
+sudo yum install autofs
+
+sudo systemctl enable --now autofs
+
+# edit /etc/auto.master or create custom master configuration file ex: /etc/auto.master.d/teams.autofs
+sudo vim /etc/auto.master.d/teams.autofs
+
+  # enter top level directory,  sub-level directory configuration file path
+  /data /etc/auto.teams # this create /teams directory automatically in client server
+
+# Create /etc/auto.teams
+
+sudo vim /etc/auto.teams
+
+  devops -rw,soft 192.168.88.132:/teams/devops # this create /teams/devops directory automatically in client server
+
+
+# check the group ID of the user that have access the to /teams/devops directory on the server VM
+# make sure to create same group ID to the user in client VM
+
+sudo groupadd devops # creating a new group
+
+sudo gpasswd -a user1 devops # adding the user1 to devops group
+
+````
+Advantages of using NFS with autofs:
+- only mount the directory when its needed, so reduce network traffic and load on server
+
+### VDO
+
+VDO (Virtual Data Optimizer). It is Logical abstraction layer between filesystem and physical storage.
+
+````bash
+# install VDO and kernel module
+sudo yum install vdo kmod-kvdo
+
+# enable and start VDO service
+sudo enable --now vdo.service
+
+# module loaded
+modprobe kvdo
+
+# create VDO, /dev/disk > 4G
+sudo vdo create --name=vdo1 --device=/dev/<disk or disk partition> --vdoLogicalSize=20G
+
+# Check deduplication and compression is enabled or not
+sudo vdo status --name=vdo1 | grep -E '(Dedup|Compression)'
+
+# incase of disable
+sudo vdo enableDeduplication --name=vdo1
+sudo vdo enableCompression --name=vdo1
+
+# make filesystem
+sudo mkfs.xfs -K /dev/mapper/vdo1
+
+sudo mkdir -m 700 -p /teams/vdo # only root user can access
+
+# persistant mount
+sudo vim /etc/fstab
+  # condition: vdo service must running before mounting
+  /dev/mapper/vdo1 /teams/vdo xfs x.systemd.requires=vdo.service 0 0
+
+sudo mount -a
+
+sudo chgrp devops /teams/vdo
+
+
+# check 
+mount -t xfs
+
+chmod -v 3770 /teams/vdo # change permissions speacial and group
+
+sudo cp /usr/share/doc/*.html /teams/vdo/
+
+for i in {1..5} ; do sudo cp /usr/share/doc/*.html /teams/vdo/file{i}; done
+
+
+# check vdo stats
+vdostats --human-readable
+
+du -sh /teams/vdo
+
+
+# Increase the Logical size
+
+sudo vdo growLogical --name=vdo1 --vdoLogicalSize=40G
+
+vdo status --name=vdo1 | grep -i 'Logical size'
+
+du -sh /teams/vdo # check the size in filesystem
+
+xfs_growfs /dev/mapper/vdo1
+
+du -sh /teams/vdo # check the size in filesystem
+````
+
+VDO’s main purpose is space efficiency (dedup + compression). It is NOT a volume manager like LVM/Stratis.
+
+### Layered storage using Stratis
+
+Stratis = Next-generation volume manager
+
+**Stratis**
+stratis volume management - managing volumes with stratis allows you to create **thinly provisioned volumes and filesystems with a single command** whilst utilizing existing dev-mapper and XFS technology.
+
+**Managing Stratis Pools**
+Stratis pools **aggregate storage space** and **represent volume groups and thin pools** in Device Mapper (DM) management. The sub-command **add-data** is used to extend the size of an existing pool.
+
+````bash
+# 01 - Install stratis and CLI tool
+sudo yum install stratisd stratis-cli
+
+sudo systemctl enable --now stratisd
+
+# 02 - pool creation
+sudo pool create pool1 /dev/<disk or disk partition>
+
+# extend pool size
+sudo pool add-data pool1 /dev/<another disk or partition>
+
+sudo stratis pool list
+
+# 03 - Create filesystem in stratis
+sudo stratis filesystem create pool1 fs1
+
+mkdir -p -m 700 /teams/stratis
+
+mount /stratis/pool1/fs1 /teams/stratis
+
+sudo chgrp devops /teams/stratis
+
+sudo chmod -v 3770 /teams/stratis
+
+# to mount persistance
+sudo vim /etc/fstab
+
+/stratis/pool1/fs1 /teams/stratis x.systemd.requires=stratisd.service 0 0
+
+mount -a
+
+mount -t xfs
+````
+
+**Snapshot**
+sudo stratis filesystem snapshot pool1 fs1 snap1
+
+sudo mkdir /backup
+
+mount /stratis/pool1/sanp1 /backup # useful in emergency time
+
+umount /backup
+
+sudo stratis filesystem destroy pool1 snap1
+
+
+
+Questions?
+
+VDO and Stratis comparsion:
+
+vdo is an abstract layer between the filesystem and physical storage.
+
+✔️ VDO
+
+- You create a VDO device on top of a disk
+
+- Specify a logical size larger than the disk
+
+- Format it with a filesystem
+
+- Mount it
+
+- VDO provides deduplication, compression, thin provisioning
+
+
+stratis create a pool between the filesystem and physical storage.
+
+✔️ Stratis
+
+- You create a pool from one or more disks
+
+- You create filesystems inside the pool
+
+- Filesystems are thin-provisioned
+
+- Stratis provides snapshots, easier management, pooling
+
+
+### SELinux and NFS onfiguration
+
+**SELinux support for NFSv4**
+
+Installing NFS man pages
+
+Man pages for SELinux types can be installed using the command **sepolicy**
+
+````bash
+# Install
+sudo yum whatprovides "*/sepolicy" # check what package sepolicy comes from?
+sudo yum install <packagename>
+
+sepolicy manpage -d nfsd_t -p /usr/share/man/man8
+
+# update database
+mandb
+
+# Search for
+apropos _selinux 
+
+# read man pages
+man nfsd_selinux
+man 8 nfsd_selinux
+````
+---
+
+
+
 

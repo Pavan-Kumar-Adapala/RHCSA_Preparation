@@ -15,7 +15,7 @@ LV (Logical Volume) – a usable storage volume created from the VG (you format 
 
 VDO (Virtual Data Optimizer)
 ============================
-VDO adds data reduction capabilities — like:
+VDO is Logical abstraction layer between Filesystem and Physical storage. VDO adds data reduction capabilities — like:
 
     + Deduplication – removes duplicate data blocks.
 
@@ -139,11 +139,15 @@ To view the space
 Example:
 
 Mount VDO LV to temporary area
+    
     mount /dev/myvg/myvdolv /mnt
 
     note:
+
         Before:
+
             df -h /mnt
+
             vdostats --human-readable
 
 ![Compare the filesystem used size and VDO LV used size, before for loop](./imgs/LVM_VDO_9.png) 
@@ -152,7 +156,9 @@ Mount VDO LV to temporary area
 
 
         After:
+
             df -h /mnt
+
             vdostats --human-readable
 
 ![Compare the filesystem used size and VDO LV used size, After for loop](./imgs/LVM_VDO_10.png) 
@@ -211,7 +217,7 @@ Real-time, practical scenarios where VDO (Virtual Data Optimizer) is genuinely u
 
 - Virtual machines often have duplicate data (same OS files, same packages).
 - VDO’s deduplication stores those identical blocks only once.
-- we can host more VMs on less physical storage.
+- we can host more VMs on less physical storage. 
 
 2. Backup and Archiving Systems
 
