@@ -3902,6 +3902,7 @@ sudo vim /etc/exports.d/teams.exports
 
 AWS: (client vm)
 
+````bash
 [ec2-user@ip-172-31-79-175 ~]$ sudo yum install nfs-utils
 
 [ec2-user@ip-172-31-79-175 ~]$ id
@@ -3942,12 +3943,14 @@ drwxr-xr-x. 2 root root 0 Nov 25 17:23 teams
 total 0 
 [ec2-user@ip-172-31-79-175 teams]$ cd devops 
 -bash: cd: devops: No such file or directory
+````
 
 Problem Reason:
 
 NETWORKING
 
 ➡ These networks cannot reach each other directly.
+
 ➡ AWS EC2 cannot reach your on-prem VMware NFS server.
 
 172.31.0.0/16 (AWS VPC range)
@@ -3957,6 +3960,7 @@ VMware: 192.168.28.0/24
 AWS VPC is a completely isolated virtual network inside Amazon.
 
 Your VMware network is a private LAN inside your home/office.
+
 
 solutions:
 
