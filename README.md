@@ -3029,7 +3029,7 @@ swapon -s
 
 
 
-## Module 05 - Creating and Configuring FileSystems
+## Module 05 - Creating, Configuring, and Managing FileSystems
 
 In Module 04, We already know about adding new disk and make partitions.
 
@@ -3042,6 +3042,7 @@ In Module 04, We already know about adding new disk and make partitions.
 
 
 ````bash
+# List the block storages
 [user1@localhost ~]$ lsblk
 NAME          MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
 sr0            11:0    1 167.3M  0 rom  /run/media/user1/CDROM
@@ -3061,7 +3062,7 @@ nvme0n2       259:4    0    10G  0 disk
 └─nvme0n2p3   259:7    0   2.5G  0 part 
   └─vg23-lv25 253:5    0     1G  0 lvm  
 
-# See filesystem info
+# List the filesystem info
 [user1@localhost ~]$ lsblk -f
 NAME          FSTYPE      FSVER            LABEL                    UUID                                   FSAVAIL FSUSE% MOUNTPOINTS
 sr0           iso9660                      CDROM                    2025-11-09-15-43-20-00                       0   100% /run/media/user1/CDROM
@@ -3081,7 +3082,7 @@ nvme0n2
 └─nvme0n2p3   LVM2_member LVM2 001                                  SPtmLj-tWYr-Sd06-x4fm-1pL3-5C5m-eD4EYw                
   └─vg23-lv25        
 
-# Read metadata check isize and bsize
+# Read Filesystem metadata check isize and bsize
 [user1@localhost ~]$ sudo xfs_info /dev/nvme0n2p1
 meta-data=/dev/nvme0n2p1         isize=512    agcount=4, agsize=163776 blks
          =                       sectsz=512   attr=2, projid32bit=1
@@ -3098,7 +3099,7 @@ realtime =none                   extsz=4096   blocks=0, rtextents=0
 [user1@localhost ~]$ sudo xfs_admin -l /dev/nvme0n2p1
 label = "DATA"
 
-# read UUID
+# print UUID
 [user1@localhost ~]$ sudo xfs_admin -u /dev/nvme0n2p1
 UUID = 58187d3a-aaa8-4c34-844d-1d3ef06d446b
                                                                                                      
@@ -3274,21 +3275,36 @@ SGID - 2 - On directories, new files are assigned the group owner from the direc
 Sticky Bit - 1 - With this set users can only delete files they own from shared directories
 
 ````bash
-mkdir -p ~/prems/dir{1..4}
+[pavan@localhost ~]$ mkdir -p prems/dir{1..4}
+[pavan@localhost ~]$ ls -l prems
+total 0
+drwxr-xr-x. 2 pavan pavan 6 Nov 23 01:34 dir1
+drwxr-xr-x. 2 pavan pavan 6 Nov 23 01:34 dir2
+drwxr-xr-x. 2 pavan pavan 6 Nov 23 01:34 dir3
+drwxr-xr-x. 2 pavan pavan 6 Nov 23 01:34 dir4
 
-chmod -v 1777 ~/prems/dir1 # Sticky bit set
+# Special permissions
+[pavan@localhost ~]$ chmod -v 1777 prems/dir1 # Sticky bit set
+mode of 'prems/dir1' changed from 0755 (rwxr-xr-x) to 1777 (rwxrwxrwt)
 
-chmod -v 2777 ~/prems/dir2 # SGID bit set
+[pavan@localhost ~]$ chmod -v 2777 prems/dir2 # SGID bit set
+mode of 'prems/dir2' changed from 0755 (rwxr-xr-x) to 2777 (rwxrwsrwx)
 
-chmod -v 3777 ~/prems/dir3 # Both the sticky bit and SGID bit set
+[pavan@localhost ~]$ chmod -v 3777 prems/dir3 # Both the sticky bit and SGID bit set
+mode of 'prems/dir3' changed from 0755 (rwxr-xr-x) to 3777 (rwxrwsrwt)
 
-chmod -v 1770 ~/prems/dir4 # Sticky bit is set but no permissions to others
-
-ls -l ~/prems
+[pavan@localhost ~]$ chmod -v 1770 prems/dir4 # Sticky bit is set but no permissions to others
+mode of 'prems/dir4' changed from 0755 (rwxr-xr-x) to 1770 (rwxrwx--T)
+[pavan@localhost ~]$ ls -l prems
+total 0
+drwxrwxrwt. 2 pavan pavan 6 Nov 23 01:34 dir1
+drwxrwsrwx. 2 pavan pavan 6 Nov 23 01:34 dir2
+drwxrwsrwt. 2 pavan pavan 6 Nov 23 01:34 dir3
+drwxrwx--T. 2 pavan pavan 6 Nov 23 01:34 dir4
 
 (or) 
 
-find ~/prems/ -type d -perm /g=s, o=t # List dirs where either SGID or Sticky bit set
+find ~/prems/ -type d -perm /g=s,o=t # List dirs where either SGID or Sticky bit set
 
 type -> d for directories, f for regular files, l for linked files
 
@@ -3300,96 +3316,231 @@ o (others) -> t -> sticky
 
 / -> either, - -> both
 
-find ~/prems/ -type d -perm -g=s, o=t # List dirs where both SGID or Sticky bit set 
+[pavan@localhost ~]$ find prems -type d 
+prems
+prems/dir1
+prems/dir2
+prems/dir3
+prems/dir4
 
-find ~/prems/ -type d -perm /o=t # List dirs where Sticky bit set 
+[pavan@localhost ~]$ find prems -type d -perm /g=s
+prems/dir2
+prems/dir3
 
-find ~/prems/ -type d -perm /o=tw # List dirs where Sticky bit set or world writable
+# List dirs where either SGID nor Sticky bit set 
+[pavan@localhost ~]$ find prems -type d -perm /g=s,o=t
+prems/dir1
+prems/dir2
+prems/dir3
+prems/dir4
+
+# List dirs where both SGID or Sticky bit set 
+[pavan@localhost ~]$ find prems -type d -perm -g=s,o=t
+prems/dir3
+
+# List dirs where Sticky bit set or world writable
+[pavan@localhost ~]$ find prems -type d -perm /o=tw
+prems/dir1
+prems/dir2
+prems/dir3
+prems/dir4
 ````
 
 **Sticky bit example:**
 
-sudo useradd -m user2
+````bash
+# Switch to root user
+[pavan@localhost ~]$ sudo -i
 
-sudo passwd
+# Create user2
+[root@localhost ~]# useradd -m user2
+[root@localhost ~]# passwd user2
+Changing password for user user2.
+New password: 
+BAD PASSWORD: The password contains the user name in some form
+Retype new password: 
+passwd: all authentication tokens updated successfully.
 
-sudo groupadd devops
+# Create a new group and add user2 to the created group
+[root@localhost ~]# sudo groupadd devops
+[root@localhost ~]# gpasswd -a user2 devops
+Adding user user2 to group devops
 
-sudo gpasswd -a user2 devops
+# Adding user2 to wheel group limited time
+echo "gpasswd -a user2 wheel" | at now + 120 minutes
 
-su - user2 # switching the user
+# Switch user to user2
+[root@localhost ~]# su - user2
+[user2@localhost ~]$ pwd
+/home/user2
 
-sudo mkdir -p -m 700 /teams/devops # Before mounting, the root user only access the /teams/devops directory
 
-ls -ld /teams/devops
+# Create a directory
+[user2@localhost ~]$ sudo mkdir -p -m 700 /teams/devops # Before mounting, the root user only access the /teams/devops directory
+# Observe the group and user details
+[user2@localhost ~]$ ls -l /teams/devops
+drwx------. 2 root root 6 Nov 23 02:31 devops
 
-sudo mount <ext4/xfs partition> /teams/devops or (mount -t ext4)
+drwxr-xr-x.   3 root root   20 Nov 23 02:31 teams
 
-ls -ld /teams/devops # Observe the group and user details
+# Access checking for User2
+[user2@localhost ~]$ cd /teams
+[user2@localhost teams]$ cd devops
+-bash: cd: devops: Permission denied
 
-cd /teams/devops
+[user2@localhost ~]$ lsblk
+NAME          MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+sr0            11:0    1 167.3M  0 rom  /run/media/pavan/CDROM
+sr1            11:1    1  11.9G  0 rom  /run/media/pavan/RHEL-9-6-0-BaseOS-x86_64
+nvme0n1       259:0    0    50G  0 disk 
+├─nvme0n1p1   259:1    0   600M  0 part /boot/efi
+├─nvme0n1p2   259:2    0     1G  0 part /boot
+└─nvme0n1p3   259:3    0  48.4G  0 part 
+  ├─rhel-root 253:0    0  46.4G  0 lvm  /
+  └─rhel-swap 253:1    0     2G  0 lvm  [SWAP]
+nvme0n2       259:4    0    20G  0 disk 
+└─nvme0n2p1   259:5    0    10G  0 part 
 
-sudo chgrp devops /teams/devops # changed the group on the directory  
+# Mounting
+[user2@localhost ~]$ sudo mount /dev/nvme0n2p1 /teams/devops
 
-sudo chmod -v 770 /teams/devops # changed the directory permissions (technically the directory called as filesystem directory), after mounting
+[user2@localhost ~]$ lsblk
+NAME          MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+sr0            11:0    1 167.3M  0 rom  /run/media/pavan/CDROM
+sr1            11:1    1  11.9G  0 rom  /run/media/pavan/RHEL-9-6-0-BaseOS-x86_64
+nvme0n1       259:0    0    50G  0 disk 
+├─nvme0n1p1   259:1    0   600M  0 part /boot/efi
+├─nvme0n1p2   259:2    0     1G  0 part /boot
+└─nvme0n1p3   259:3    0  48.4G  0 part 
+  ├─rhel-root 253:0    0  46.4G  0 lvm  /
+  └─rhel-swap 253:1    0     2G  0 lvm  [SWAP]
+nvme0n2       259:4    0    20G  0 disk 
+└─nvme0n2p1   259:5    0    10G  0 part /teams/devops
 
-touch file1 # the file owner is user2
+# Change group and modify permissions for the filesystem (/teams/devops)
+[user2@localhost ~]$ sudo chgrp devops /teams/devops
+[user2@localhost ~]$ sudo chmod -v 770 /teams/devops
+mode of '/teams/devops' changed from 0755 (rwxr-xr-x) to 0770 (rwxrwx---)
 
-sudo touch root1 # the file owner is root
+[user2@localhost ~]$ ls -l /teams
+total 0
+drwxrwx---. 2 root devops 6 Nov 23 02:13 devops
 
-ls -l
 
-rm * # the user2 to belong to **devops** group
+# Check the user belong to devops group or not
+[user2@localhost devops]$ id
+uid=1001(user2) gid=1001(user2) groups=1001(user2),10(wheel),1002(devops) context=unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023
 
-sudo chmod o+t /teams/devops # Special permission (sticky bit) added
+## Before Special permissions
 
-sudo touch root1 # the file owner is root
+[user2@localhost ~]$ cd /teams/devops
+[user2@localhost devops]$ touch file1
+[user2@localhost devops]$ sudo touch root1
+[user2@localhost devops]$ ls -l
+total 0
+-rw-r--r--. 1 user2 user2 0 Nov 23 02:54 file1
+-rw-r--r--. 1 root  root  0 Nov 23 02:54 root1
 
-touch file1 # the file owner is user2
+[user2@localhost devops]$ rm *
+rm: remove write-protected regular empty file 'root1'? yes
+[user2@localhost devops]$ ls -l
+total 0
 
-ls -l
+## After Special permissions
 
-rm root1 # Error: operation not permitted, because sticky bit won't allow user2 to delete file. Because he is not the owner even though **user2 belong to devops group**.
+[user2@localhost ~]$ sudo chmod o+t /teams/devops
+
+[user2@localhost ~]$ ls -l /teams/
+total 0
+drwxrwx--T. 2 root devops 6 Nov 23 02:58 devops
+
+[user2@localhost ~]$ touch /teams/devops/file1
+[user2@localhost ~]$ sudo touch /teams/devops/root1
+
+[user2@localhost ~]$ ls -l /teams/devops
+total 0
+-rw-r--r--. 1 user2 user2 0 Nov 23 03:03 file1
+-rw-r--r--. 1 root  root  0 Nov 23 03:03 root1
+
+[user2@localhost ~]$ cd /teams/devops
+
+[user2@localhost devops]$ rm root1
+rm: remove write-protected regular empty file 'root1'? yes
+rm: cannot remove 'root1': Operation not permitted
+
+[user2@localhost devops]$ rm file1
+
+[user2@localhost devops]$ ls -l
+total 0
+-rw-r--r--. 1 root root 0 Nov 23 03:03 root1
+
+````
+
+Note:
+
+rm root1 # Error: operation not permitted, because sticky bit won't allow user2 to delete file. Because he is not the file owner.
 
 rm file1 # No Error, because user2 is the file owner
 
-su - user1
+*Sticky bit permission at directory level - only allow the file owner delete the files inside that directory*
 
-cd /teams/devops # Are user1 able to access the directory? Ans: no
 
 **SGID**
 
+````bash
 su - user2
 
 cd /teams/devops
 
-umask 007
+[user2@localhost devops]$ umask 007
 
-touch file1
+[user2@localhost devops]$ touch file1
 
-sudo touch root1
+[user2@localhost devops]$ sudo touch root1
 
-ls -l file1
+[user2@localhost devops]$ ls -l
+total 0
+-rw-rw----. 1 user2 user2 0 Nov 23 03:18 file1
+-rw-r-----. 1 root  root  0 Nov 23 03:18 root1
 
-sudo chmod -v g+s . # . -> /teams/devops
+# Adding SGID (. -> /teams/devops)
+[user2@localhost devops]$ sudo chmod -v g+s .
+mode of '.' changed from 1770 (rwxrwx--T) to 3770 (rwxrws--T)
 
-touch file2
+# Removing sticky bit
+[user2@localhost devops]$ sudo chmod -v o-t .
+mode of '.' changed from 3770 (rwxrws--T) to 2770 (rwxrws---)
 
-ls -l
+[user2@localhost teams]$ ls -l /teams
 
-**observe the user and group difference between file1 and file2**
+drwxrws---. 2 root devops 32 Nov 23 03:18 devops
 
-sudo -i # Switch to root user
+[user2@localhost devops]$ touch file2
+[user2@localhost devops]$ ls -l
+total 0
+-rw-rw----. 1 user2 user2  0 Nov 23 03:18 file1
+-rw-rw----. 1 user2 devops 0 Nov 23 03:24 file2
 
-umask 007
+Note: **observe the user and group difference between file1 and file2** - The directory level group assigned automatically to the newly created files/directories inside /teams/devops after SGID 
 
-touch /teams/devops/root2
+# Switch to root user
+[user2@localhost devops]$ sudo -i
 
-exit
+[root@localhost ~]# umask 007
+[root@localhost ~]# touch /teams/devops/root2
+[root@localhost ~]# exit
+logout
+[user2@localhost devops]$ ls -l
+-rw-r-----. 1 root  root   0 Nov 23 03:18 root1
+-rw-rw----. 1 root  devops 0 Nov 23 03:29 root2
 
-ls -l /teams/devops
+Note: **observe the user and group difference between root1 and root2** - directory level user group assigned automatically to new files/directories inside /teams/devops, by any user belong to devops group or root user.
 
-**observe the user and group difference between root1 and root2**
+````
+
+Note:
+
+The special permission are very useful to work collaboratively with consistency (automatically same group name), security (only file owner delete files).
 
 
 #### Sharing filesystems using NFS
@@ -3397,9 +3548,8 @@ ls -l /teams/devops
 We can share the files using NFS protocol between client and server systems. 
 
 + Install nfs-utils in both server and client VMs
-+ add nfs service in Firewall inbound rules
-+ edit **/etc/exports** default configuration file or **/etc/exports.d/<customname>.exports**
-
++ Inside server VM, add nfs service in Firewall inbound rules
++ Inside server VM, edit **/etc/exports** default configuration file or **/etc/exports.d/<customname>.exports**
 
 
 - **nfsconf** management tool that writes to the new **/etc/nfs.conf** configuration file.
@@ -3420,7 +3570,7 @@ We can share the files using NFS protocol between client and server systems.
 
   firewall-cmd --add-service=nfs
 
-  firewall-cmd --runtime-to-permanet
+  firewall-cmd ----runtime-to-permanent
 
 Note: 
 
@@ -3506,38 +3656,184 @@ sudo ls -l /teams/devops
 # Create the custom configuration file and enter
 sudo vim /etc/exports.d/teams.exports
 
-  /teams/devops 192.168.88.132/24(no_root_squash,rw,sync)
-  # shared directory <how will access the directory> <permission and sync>
+  /teams/devops <Public IP>/<CIDR>(no_root_squash,rw,sync)
+  # shared directory <who will access the directory> <permission and sync, no_root_squash>
 
 sudo exportfs -r
 
+sudo exportfs -rav
+
 [user1@localhost ~]$ sudo exportfs
-/teams/devops 	192.168.88.132/24
+
+/teams/devops 192.168.28.128/24
+
+````
 
 
-
+````bash
 # Inside Client VM
 
 # 01 - Install nfs-utils
 sudo yum install nfs-utils -y
 
-# Start and enable nfs service
-sudo systemctl enable --now nfs-server
-
-sudo systemctl status nfs-server
 
 # 02 - mount nfs to clent side filesystem
 
-sudo mount -t nfs4 192.168.88.132:/teams/devops /mnt
+sudo mount -t nfs4 <NFS server VM IP>:/teams/devops /mnt
+# sudo mount -t nfs4 -o vers=4 <server-ip>:/teams/devops /mnt
 
-sudo ls -l /mnt # check you are able to access the files
+sudo ls -l /mnt # check you are able to access the files, you can't able to list because (in server side, sudo mkdir -p -m 700 /teams/devops)
 
+  # Before mounting 
+
+  ## root user
+  [root@localhost ~]# ls -l /
+  drwxr-xr-x.   2 root root  150 Nov 21 11:07 mnt
+
+  [root@localhost ~]$ cd /mnt
+
+  [root@localhost mnt]$ 
+
+  # Normal user (wheel)
+  [pavan@localhost ~]$ cd /mnt
+
+  [pavan@localhost mnt]$ 
+
+
+  # After mounting
+
+  ## root user
+  [root@localhost ~]# ls -l /
+  drwx------.   2 root root  150 Nov 21 11:07 mnt
+
+  [root@localhost ~]# cd /mnt
+  -bash: cd: /mnt: Permission denied
+
+  Note: After mounting, the directory /mnt permissions reflect server-side ownership, not client-side permissions.
+````
+
+**About no_root_squash**
+
+Inside NFS server VM
+
+sudo vim /etc/exports.d/teams.exports
+
+  /teams/devops <Public IP>/<CIDR>(rw,sync)
+
+Without `no_root_squash`, even the **root user** on the client cannot fully access the exported directory (`/mnt`) on the NFS server.
+
+
+Why this happens:
+
+1. **NFS user mapping**
+
+   By default, NFS does **not trust the client’s root user**. Instead, it maps requests from **root (UID 0) on the client** to **nobody:nogroup** on the server. This is called **root squashing**.
+
+   * Example:
+
+     ```text
+     Client root (UID 0) → Server nobody (UID 65534)
+
+     [user1@localhost teams]$ sudo cat /etc/passwd | grep -i nobody
+   
+     nobody:x:65534:65534:Kernel Overflow User:/:/sbin/nologin
+     ```
+   * This prevents a remote root from having full control over the exported filesystem, which is a **security feature**.
+
+2. **Effect on permissions**
+
+  Because the client’s root is mapped to `nobody`, it loses write access (or sometimes even read access) if the permissions on the exported directory are restrictive. So even `root` on the client behaves like an unprivileged user on the server.
+
+3. **`no_root_squash`**
+
+   Adding this option in `/etc/exports.d/teams.exports` disables the root mapping:
+
+   ```text
+   /teams/devops <Public IP>/<CIDR>(rw,sync,no_root_squash)
+   ```
+
+   * Now, **root on the client remains root on the server**, with full privileges.
+   * This is **dangerous** if the client is not fully trusted, because it gives root full control over the server’s filesystem.
+
+
+Security implications:
+
+* `no_root_squash` should only be used in **trusted environments** (like your own internal lab network).
+
+
+✅ **Summary:**
+
+* Default behavior: `root` on the client → `nobody` on the server (**root squashed**)
+* With `no_root_squash`: `root` on the client → `root` on the server (**full access**)
+* Without `no_root_squash`, root access fails if directory permissions don’t allow `nobody` to write.
+
+
+NFS Server VM:
+
+````bash
+[user1@localhost teams]# sudo chgrp -v devops devops
+changed group of 'devops' from root to devops
+
+[user1@localhost teams]# ls -l
+total 0
+drwxr-xr-x. 2 root devops 150 Nov 21 17:07 devops
+
+Note down the group ID of the shared file belong to:  **1001(devops)**  
+
+
+[user1@localhost teams]$ sudo chmod -v 1770 devops
+mode of 'devops' changed from 0755 (rwxr-xr-x) to 1770 (rwxrwx--T)
+
+[user1@localhost teams]$ ls -l
+total 0
+drwxrwx--T. 2 root devops 150 Nov 21 17:07 devops
+````
+
+NFS Client VM:
+
+````bash
+[pavan@localhost /]$ ls -l
+drwxrwx--T.   2 root devops  150 Nov 21 11:07 mnt
+
+[pavan@localhost /]$ id
+uid=1000(pavan) gid=1000(pavan) groups=1000(pavan),10(wheel),1001(devops) context=unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023
+
+[pavan@localhost /]$ sudo -i
+[root@localhost ~]# cd /mnt
+-bash: cd: /mnt: Permission denied
+````
+
+Note:
+
+```
+/etc/exports.d/teams.exports → /teams/devops <Public IP>/<CIDR>(rw,sync)
+```
+
+Because `no_root_squash` is **not** used, the **root user on the client** is mapped to `nobody:nogroup` on the NFS server:
+
+```bash
+[user1@localhost teams]$ sudo cat /etc/passwd | grep -i nobody
+nobody:x:65534:65534:Kernel Overflow User:/:/sbin/nologin
+```
+
+However, the **devops** group has the same **GID 1001** on both the server and the client.
+This means the client user **pavan**, who belongs to the `devops` group, receives proper **group-level permissions** on the shared directory:
+
+```
+drwxrwx--T. 2 root devops 150 Nov 21 17:07 devops
+```
+
+
+
+````bash 
+
+Inside Client VM 
 
 ## mount persistance
 
 - edit /etc/fstab
 
-  192.168.88.132:/teams/devops /mnt nfs defaults 0 0
+  <NFS server VM IP>:/teams/devops /mnt nfs defaults 0 0
 
 or 
 
@@ -3554,25 +3850,148 @@ sudo systemctl enable --now autofs
 sudo vim /etc/auto.master.d/teams.autofs
 
   # enter top level directory,  sub-level directory configuration file path
-  /data /etc/auto.teams # this create /teams directory automatically in client server
+  /teams /etc/auto.teams # this create /teams directory automatically in client server
 
-# Create /etc/auto.teams
+# Inside /etc/auto.teams
 
 sudo vim /etc/auto.teams
 
-  devops -rw,soft 192.168.88.132:/teams/devops # this create /teams/devops directory automatically in client server
+  devops -rw,soft <NFS server VM IP>:/teams/devops # this create /teams/devops directory automatically in client server
 
+results:
 
-# check the group ID of the user that have access the to /teams/devops directory on the server VM
-# make sure to create same group ID to the user in client VM
+## root user
+[root@localhost]# ls -l /
+drwxr-xr-x.   2 root root    0 Nov 25 11:58 teams
+
+[root@localhost]# cd /teams
+[root@localhost teams]# cd devops
+-bash: cd: devops: Permission denied
+
+## normal user belong to devops group
+[root@localhost teams]# su - pavan
+[pavan@localhost ~]$ cd /teams/devops
+[pavan@localhost devops]$ ls -l
+total 2272
+-rw-r--r--. 1 root root 691531 Nov 21 11:07 gutenprint-users-manual.pdf
+-rw-r--r--. 1 root root 235941 Nov 21 11:07 Padauk-features.pdf
+-rw-r--r--. 1 root root 371473 Nov 21 11:07 Padauk-typesample.pdf
+-rw-r--r--. 1 root root 995234 Nov 21 11:07 PakTypeNaskhBasicFeatures.pdf
+-rw-r--r--. 1 root root  24867 Nov 21 11:07 pigz.pdf
+
+# Check the group ID of the /teams/devops directory on the server VM
+# Inside client VM, Make sure to create group with same group ID add the user to the group
 
 sudo groupadd devops # creating a new group
 
-sudo gpasswd -a user1 devops # adding the user1 to devops group
+sudo gpasswd -a pavan devops # adding the pavan to devops group
 
 ````
 Advantages of using NFS with autofs:
-- only mount the directory when its needed, so reduce network traffic and load on server
+- only mount the directory when its needed, so **reduce network traffic and load on server**
+
+
+Server VM:
+
+sudo vim /etc/exports.d/teams.exports
+
+  /teams/devops 172.31.0.0/16(rw,sync)
+
+  172.31.0.0/16 -> VPC 
+
+
+AWS: (client vm)
+
+[ec2-user@ip-172-31-79-175 ~]$ sudo yum install nfs-utils
+
+[ec2-user@ip-172-31-79-175 ~]$ id
+uid=1000(ec2-user) gid=1000(ec2-user) groups=1000(ec2-user),4(adm),190(systemd-journal),1001(devops) context=unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023
+
+
+[ec2-user@ip-172-31-79-175 ~]$ sudo vim /etc/auto.master.d/teams.autofs
+
+  /teams /etc/auto.teams
+
+[ec2-user@ip-172-31-79-175 ~]$ sudo vim /etc/auto.teams
+
+  devops -rw,soft 192.168.28.129:/teams/devops
+
+192.168.28.129  -> Server VM IP
+
+[ec2-user@ip-172-31-79-175 ~]$ sudo systemctl restart autofs
+[ec2-user@ip-172-31-79-175 ~]$ sudo systemctl status autofs
+● autofs.service - Automounts filesystems on demand
+     Loaded: loaded (/usr/lib/systemd/system/autofs.service; disabled; preset: disabled)
+     Active: active (running) since Tue 2025-11-25 17:23:13 UTC; 9s ago
+ Invocation: 73617b064a474d70bb925ba0e2f92245
+   Main PID: 2030 (automount)
+      Tasks: 7 (limit: 5108)
+     Memory: 1.9M (peak: 2.5M)
+        CPU: 23ms
+     CGroup: /system.slice/autofs.service
+             └─2030 /usr/sbin/automount --systemd-service --dont-check-daemon
+
+Nov 25 17:23:13 ip-172-31-79-175.ec2.internal systemd[1]: Starting autofs.service - Automounts filesystems on demand...
+Nov 25 17:23:13 ip-172-31-79-175.ec2.internal (utomount)[2030]: autofs.service: Referenced but unset environment variable evaluates to an empty string: OPTIONS
+Nov 25 17:23:13 ip-172-31-79-175.ec2.internal systemd[1]: Started autofs.service - Automounts filesystems on demand.
+
+
+drwxr-xr-x. 2 root root 0 Nov 25 17:23 teams
+[ec2-user@ip-172-31-79-175 /]$ cd teams/ 
+[ec2-user@ip-172-31-79-175 teams]$ ls -l 
+total 0 
+[ec2-user@ip-172-31-79-175 teams]$ cd devops 
+-bash: cd: devops: No such file or directory
+
+Problem Reason:
+
+NETWORKING
+
+➡ These networks cannot reach each other directly.
+➡ AWS EC2 cannot reach your on-prem VMware NFS server.
+
+172.31.0.0/16 (AWS VPC range)
+
+VMware: 192.168.28.0/24
+
+AWS VPC is a completely isolated virtual network inside Amazon.
+
+Your VMware network is a private LAN inside your home/office.
+
+solutions:
+
+Option 1 — AWS Site-to-Site VPN
+
+
+Option 2 — WireGuard VPN (Easiest)
+
+Install WireGuard:
+
+  On AWS EC2
+
+  On VMware VM
+
+
+
+Additional Info:
+
+````text
++ NFSv4 uses a single port (2049), so firewall rules are simpler than NFSv3
+
++ If only NFSv4 is needed, you can disable NFSv3 explicitly in /etc/nfs.conf
+
++ sync ensures writes are committed immediately; safer but slightly slower.
+
++ async is faster but risky if server crashes.
+
++ soft vs hard in mounts: soft allows client to fail on server unavailability; hard retries indefinitely.
+
+If SELinux is enabled on server, may need:
+
+  sudo setsebool -P nfs_export_all_rw 1
+
+  sudo chcon -Rt nfs_t /teams/devops
+````
 
 ### VDO
 
@@ -3643,6 +4062,7 @@ du -sh /teams/vdo # check the size in filesystem
 ````
 
 VDO’s main purpose is space efficiency (dedup + compression). It is NOT a volume manager like LVM/Stratis.
+
 
 ### Layered storage using Stratis
 
@@ -3761,6 +4181,104 @@ man 8 nfsd_selinux
 ````
 ---
 
+## Module 06 - Depoly, Configuring and Maintaining Systems
+
+### Managing Software Packages
+
+
+### Configuring Time Services
+
+What I am learning under this section?
+
+- Network time protocol (difference between chronyd and ntpd)
+- chrony
+- timedatectl command and configuring local time
+- editing files with sed command
+
+#### chrony
+
+chrony is the package comes with server and client.
+
+yum list chrony # check chrony installed or not
+
+systemctl status chronyd # check the chronyd service status
+
+**chrony configuration**
+
+/etc/chrony.conf in RHEL 
+
+/etc/chrony/chrony.conf in Ubuntu
+
+Editing the configuration may be useful to set a local timeserver source provided by your own network infrastructure or choosing an external pool based on geography.
+
+**sed - stream editer**
+
+cat /etc/chrony.conf
+
+man 5 chrony.conf # detail documentation
+
+vim my.sed
+````bash
+# d for delete, commented lines and empty lines
+/^(#|$)/d
+# edit the line start with pool 
+/^pool/i pool uk.pool.ntp.org
+/^pool.*rhel/d
+````
+
+sed -Ef my.sed /etc/chrony.conf # E for enhanced regular expresion. it will not edit the file, just shows the how it modifies the file
+
+sed -i -Ef my.sed /etc/chrony.conf # apply the modifications by editing (i for inplace edit)
+
+systemctl restart chrony
+
+**chronyc tools**
+
+(chronyc -> for client, chronyd -> for daemon)
+
+chrony advantages:
+- Fast synchronization
+- Cater for CPU load
+
+Tools:
+  - chronyc tracking # command
+  - chronyc sources # command ... other command available (chronyc sources -v)
+  - chronyc
+
+
+### Managing Systemd targets
+
+what I am learning in this section?
+
+- The purpose of systemd targets
+- Identify the current targets
+- Change targets on running system
+- Modify the default target
+- Booting to a specified target
+- Modify the bootloader GRUB
+
+**systemd targets**
+targets was introduced with RHEL 7 in systemd. In previous versions runlevels were used.
+
+**targets represent groups of services that should be loaded** and replace runlevels which were used previously. Unlike runlevels, **targets have descriptive names such as graphical and multi-user**.
+
+runlevel
+
+man runlevel # old one
+
+systemctl list-units --type target --state active # current target
+
+systemctl get-default
+
+systemctl cat multi-user.target
+
+systemctl set-default graphical.target # change the deafult target
+
+systemctl isolate # useful to change the target
+
+systemctl isolate graphical.target
+
+runlevel 
 
 
 
