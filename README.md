@@ -4381,7 +4381,7 @@ systemctl status dnf-makecache.service
 
 systemctl list-timers # full information about the jobs
 
-
+---
 
 ## Module 07 - Managing Networking
 
@@ -4798,7 +4798,7 @@ PING 192.168.100.1 (192.168.100.1) 56(84) bytes of data.
 --- 192.168.100.1 ping statistics ---
 5 packets transmitted, 0 received, 100% packet loss, time 4143ms
 
-# Adding route 
+# Adding static route 
 [user1@localhost ~]$ sudo ip route add 192.168.100.0/24 via 10.0.0.2
 
 [user1@localhost ~]$ ping -c5 192.168.100.1
@@ -4837,6 +4837,40 @@ Destination     Gateway         Genmask         Flags   MSS Window  irtt Iface
 ````
 
 This allows communication between branch office 1 and branch office 2 using Private IPs.
+
+
+Let’s break this down carefully to understand **how adding a static route enables communication between two different subnets (like your “branch offices”)**.
+
+
+* **Default namespace IP:** `10.0.0.2/24` on `veth0`
+* **Namespace `mlops` IPs:**
+
+  * `veth1` → `10.0.0.1/24` (same subnet as default namespace)
+  * `veth1` → `192.168.100.1/24` (different subnet)
+* **Problem:** From the default namespace, `ping 192.168.100.1` fails initially → 0% packet received.
+
+
+**Why the ping initially failed**
+
+1. `192.168.100.1` is **not in the same subnet** as `10.0.0.2` (default namespace).
+2. The Linux kernel does not know **which route to take** to reach `192.168.100.0/24`.
+3. Without a route, packets are dropped → ping fails.
+
+
+**How adding a static route fixes it**
+
+```bash
+sudo ip route add 192.168.100.0/24 via 10.0.0.2
+```
+
+* This tells the **default namespace**:
+
+  > “To reach the 192.168.100.0/24 subnet, send packets via `10.0.0.2` (your local veth0 interface).”
+
+* `veth0` and `veth1` form a **direct virtual cable**, so traffic sent via `10.0.0.2` reaches `veth1` inside `mlops`.
+
+* Inside `mlops`, the kernel sees that `192.168.100.1` is **directly reachable on veth1**, so the reply comes back → ping succeeds.
+
 
 
 ### Persisting Network Configurations
