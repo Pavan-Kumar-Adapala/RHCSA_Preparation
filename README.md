@@ -4278,11 +4278,568 @@ systemctl cat multi-user.target
 
 systemctl set-default graphical.target # change the deafult target
 
-systemctl isolate # useful to change the target
-
-systemctl isolate graphical.target
+systemctl isolate graphical.target # useful to change the target, while system running
 
 runlevel 
+
+
+**Booting with specified target, Modifying the bootloader GRUB**
+
+Specific target:
+
+The specific target can be specified during the boot by editing GRUB at the console (or) by adding entries to the GRUB boot loader.
+
+Should we want to boot to **graphical.target** irrespective of the default target we can use the **grubby CLI tool**
+
+sudo -i # root user
+
+grubby --info=ALL # shows all grub boot entries information
+
+grubby --update-kernel=ALL --args="systemd-unit=graphical.target" # Add kernel arguments, we can specify the kernel path
+
+
+grubby --info=ALL
+
+
+grubby --update-kernel=ALL --remove-args="systemd-unit=graphical.target" # Remove kernel arguments
+
+
+
+### Scheduling the jobs
+
+- Scheduling ad-hoc tasks using at # ad-hoc tasks ex: run some tasks on bank holidays
+
+- Scheduling regular tasks
+  + Using **cron**
+  + Using **systemd timers**
+
+We have 3 choices for scheduling the jobs:
+
+1. at -> when the tasks (non-regular) needs to be scheduled on a non-recurring basis
+
+2. cron -> Great for scheduling regular tasks on a recurring basis
+
+3. systemd timer units -> New to systemd we can have timer units for scheduling recurring tasks
+
+
+**at**
+
+- Install at
+
+  sudo yum install at
+
+  sudo systemctl status atd
+
+  sudo systemctl enable --now atd
+
+Note:
+
+  we can allow and deny user to schedule the tasks by creating */etc/at.allow* and */etc/at.deny* files and mention the user in the file.
+
+
+atq -> list the scheduled jobs
+
+atrm -> removes the job by specifying job ID
+
+at -c <jobID> # cat out the job
+
+
+**cron**
+
+ls -l /etc/cron*
+
+cat /etc/crontab
+                                    
+<min hour day-of-the-month month weekday>
+
+ex:
+
+echo "15 7 * * 6 root ls /etc > /tmp/sales" > /etc/cron.d/sales.cron
+
+/etc/cron.allow # listed users allow to create and manage crontab
+
+/etc/cron.deny # listed users not allow to create and manage crontab
+
+crontab -e # edit the cron file, (user crons)
+
+crontab -l # list the jobs
+
+crontab -r # remove
+
+
+**systemd timer units**
+
+man 5 systemd.timer # about timer units
+
+systemctl list-unit-files --type=timer
+
+yum check-update | head -n2 
+
+systemctl cat dnf-makecache.timer
+
+systemctl status dnf-makecache.service 
+
+systemctl list-timers # full information about the jobs
+
+
+
+## Module 07 - Managing Networking
+
+- Configuring Ip address settings
+- Managing Firewalls with **firewalld and NFTables(Backed Firewall)**
+
+### Managing the TCP/IP stack with ip command
+
+ifconfig -> configure a network interface, but this option is deprecated. use ip addr or ip link
+
+
+ip address show (or) ip addr sh (or) ip a
+
+ip addr → manage IP addresses
+
+ip link → manage network interface cards (NICs)
+
+ip route → manage routing tables
+
+ip neighbor → manage ARP cache
+
+
+#### IP, ARP Cache, Network Namespace, and Route Tables
+
+##### Adding the IP address
+
+We can dynamically assign an IP address working as the root user. This effects the runtime configuration but does not persist.
+
+
+sudo ip addr add 172.16.1.100/24 dev eth1
+
+ip -4 addr
+
+sudo ip addr --help
+
+
+##### ARP cache
+
+The ARP or Address Resolution Cache can also be viewed and managed with ip. **This maps IP addresses to physical address for devices on the same network**.
+
+Purpose: Maps IP addresses → MAC addresses on the same network.
+
+ip neighbor show # shows arp cache
+
+````bash
+[user1@localhost ~]$ ip neighbor
+192.168.28.254 dev ens160 lladdr 00:50:56:fb:92:98 STALE
+192.168.28.2 dev ens160 lladdr 00:50:56:e8:da:f8 STALE 
+
+# ping Google's public DNS server using it's IP address 8.8.8.8
+[user1@localhost ~]$ ping 8.8.8.8
+PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
+64 bytes from 8.8.8.8: icmp_seq=1 ttl=128 time=8.09 ms
+64 bytes from 8.8.8.8: icmp_seq=2 ttl=128 time=13.9 ms
+64 bytes from 8.8.8.8: icmp_seq=3 ttl=128 time=11.2 ms
+64 bytes from 8.8.8.8: icmp_seq=5 ttl=128 time=10.3 ms
+64 bytes from 8.8.8.8: icmp_seq=6 ttl=128 time=14.2 ms
+^C
+--- 8.8.8.8 ping statistics ---
+6 packets transmitted, 5 received, 16.6667% packet loss, time 5072ms
+rtt min/avg/max/mdev = 8.086/11.540/14.222/2.295 ms
+
+
+[user1@localhost ~]$ ip neighbor
+192.168.28.254 dev ens160 lladdr 00:50:56:fb:92:98 STALE 
+192.168.28.2 dev ens160 lladdr 00:50:56:e8:da:f8 REACHABLE 
+
+# sudo ip neighbor delete <device Ip> <dev> <ethernet card> lladdr <MAC address>
+
+sudo ip neighbor delete dev ens160 lladdr 00:50:56:e8:da:f8 
+````
+
+192.168.28.2 is the VMware NAT virtual gateway
+
+````text
+Internal routing 
+
+ping 8.8.8.8 
+
+RHEL VM → (VMware NAT) → Windows host → WiFi → Internet
+````
+
+How to do you know the mac address of device?
+
+Initially, ARP sends the request to device in the same network and device sends the response with MAC address. MAC address stores in the memory to serve the data without send ARP request again.
+
+
+**ARP Cache timeout**
+
+Entries became STALE in the ARP cache after 60 seconds by default in linux. The **gc_statte_time** value controls this. 
+
+gc -> garbage collection
+
+````bash
+[user1@localhost ~]$ ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: ens160: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
+    link/ether 00:0c:29:7b:e2:62 brd ff:ff:ff:ff:ff:ff
+    altname enp3s0
+    inet 192.168.28.129/24 brd 192.168.28.255 scope global dynamic noprefixroute ens160
+       valid_lft 901sec preferred_lft 901sec
+    inet6 fe80::20c:29ff:fe7b:e262/64 scope link noprefixroute 
+       valid_lft forever preferred_lft forever
+
+# To look the default ARP cache timeout
+[user1@localhost ~]$ sudo cat /proc/sys/net/ipv4/neigh/ens160/gc_stale_time
+60
+
+# For all network cards
+[user1@localhost ~]$ sudo sysctl -a | grep gc_stale_time
+net.ipv4.neigh.default.gc_stale_time = 60
+net.ipv4.neigh.ens160.gc_stale_time = 60
+net.ipv4.neigh.lo.gc_stale_time = 60
+net.ipv6.neigh.default.gc_stale_time = 60
+net.ipv6.neigh.ens160.gc_stale_time = 60
+net.ipv6.neigh.lo.gc_stale_time = 60
+
+# Note: Changing the default (gc_stale_time) value won't effect the existing network cards. The default value apply to newly creating networkcards.
+
+[user1@localhost ~]$ sudo sysctl -w net.ipv4.neigh.default.gc_stale_time=120
+
+net.ipv4.neigh.default.gc_stale_time = 120
+
+[user1@localhost ~]$ sudo sysctl -a | grep gc_stale_time
+net.ipv4.neigh.default.gc_stale_time = 120
+net.ipv4.neigh.ens160.gc_stale_time = 60
+net.ipv4.neigh.lo.gc_stale_time = 60
+net.ipv6.neigh.default.gc_stale_time = 60
+net.ipv6.neigh.ens160.gc_stale_time = 60
+net.ipv6.neigh.lo.gc_stale_time = 60
+
+# To make persistent enter in /etc/sysctl.conf
+
+sudo vim /etc/sysctl.conf
+
+  net.ipv4.neigh.default.gc_stale_time = 120
+
+````
+
+##### Network Namespaces
+
+Network namespaces allow for indepenent IP stacks on your system, isolating networks where you allow connectivity via network routes. Often used by virtualization hosts such as OpenStack.
+
+````text
+man ip netns
+
+ip netns # list the network namespaces
+
+sudo ip netns add <namespace name> # create a name space
+````
+
+````bash
+## Before
+# Checking NICs
+[user1@localhost ~]$ ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: ens160: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
+    link/ether 00:0c:29:7b:e2:62 brd ff:ff:ff:ff:ff:ff
+    altname enp3s0
+    inet 192.168.28.129/24 brd 192.168.28.255 scope global dynamic noprefixroute ens160
+       valid_lft 1395sec preferred_lft 1395sec
+    inet6 fe80::20c:29ff:fe7b:e262/64 scope link noprefixroute 
+       valid_lft forever preferred_lft forever
+
+
+# Checking Route tables
+[user1@localhost ~]$ ip route
+default via 192.168.28.2 dev ens160 proto dhcp src 192.168.28.129 metric 100 
+192.168.28.0/24 dev ens160 proto kernel scope link src 192.168.28.129 metric 100 
+
+## After
+# Creating a NAMESPACE
+[user1@localhost ~]$ sudo ip netns add mlops
+
+[user1@localhost ~]$ sudo ip netns
+mlops
+
+[user1@localhost ~]$ sudo ip netns exec mlops ip addr
+
+1: lo: <LOOPBACK> mtu 65536 qdisc noop state DOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+
+# Note: LOOPBACK NIC in DOWN state
+
+[user1@localhost ~]$ sudo ip netns exec mlops ip link set dev lo up
+
+[user1@localhost ~]$ sudo ip netns exec mlops ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+
+````
+
+*A Namespace needs NICs (Network Interface Cards)*
+
+We can add two virtual NICs, (veth0 and veth1). With veth1 being added to the isolated namespace. To see veth1 we need to **exec** command from within namespace.
+
+
+*Adding Addresses*
+
+For communication, we need network addresses for virtual NICs.
+
+To add addresses to **veth1** we must run this in the context of the namespace, whereas **veth0** is accessible from the default namespace. 
+
+As the virtual NICs are peers they are linked together as if connected to the same switch (physical connection); adding addresses on the same network allows network communication.
+
+````bash
+# Creating two virtual NICs and are linked together through the peer networking
+user1@localhost ~]$ sudo ip link add veth0 type veth peer name veth1 netns mlops
+
+
+# In default namespace
+[user1@localhost ~]$ sudo ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: ens160: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
+    link/ether 00:0c:29:7b:e2:62 brd ff:ff:ff:ff:ff:ff
+    altname enp3s0
+    inet 192.168.28.129/24 brd 192.168.28.255 scope global dynamic noprefixroute ens160
+       valid_lft 1752sec preferred_lft 1752sec
+    inet6 fe80::20c:29ff:fe7b:e262/64 scope link noprefixroute 
+       valid_lft forever preferred_lft forever
+6: veth0@if2: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default qlen 1000
+    link/ether 56:c6:21:5f:11:b5 brd ff:ff:ff:ff:ff:ff link-netns mlops
+
+# In mlops namespace
+[user1@localhost ~]$ sudo ip netns exec mlops ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: veth1@if6: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default qlen 1000
+    link/ether 82:a8:16:40:ce:e6 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+
+# The Two Virtual Network Interface Cards (NICs) are in DOWN state
+
+# Adding the IP Addresses inside NAMESPACE mlops
+[user1@localhost ~]$ sudo ip netns exec mlops ip addr add 10.0.0.1/24 dev veth1
+
+[user1@localhost ~]$ sudo ip netns exec mlops ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: veth1@if6: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default qlen 1000
+    link/ether 82:a8:16:40:ce:e6 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 10.0.0.1/24 scope global veth1
+       valid_lft forever preferred_lft forever
+
+# Status UP
+[user1@localhost ~]$ sudo ip netns exec mlops ip link set dev veth1 up
+
+[user1@localhost ~]$ sudo ip netns exec mlops ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: veth1@if6: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state LOWERLAYERDOWN group default qlen 1000
+    link/ether 82:a8:16:40:ce:e6 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 10.0.0.1/24 scope global veth1
+       valid_lft forever preferred_lft forever
+
+# Test Inside mlops using ping
+[user1@localhost ~]$ sudo ip netns exec mlops ping -c20 10.0.0.1
+PING 10.0.0.1 (10.0.0.1) 56(84) bytes of data.
+64 bytes from 10.0.0.1: icmp_seq=1 ttl=64 time=1.89 ms
+64 bytes from 10.0.0.1: icmp_seq=2 ttl=64 time=0.263 ms
+64 bytes from 10.0.0.1: icmp_seq=3 ttl=64 time=0.097 ms
+64 bytes from 10.0.0.1: icmp_seq=4 ttl=64 time=0.073 ms
+64 bytes from 10.0.0.1: icmp_seq=5 ttl=64 time=0.785 ms
+64 bytes from 10.0.0.1: icmp_seq=6 ttl=64 time=0.126 ms
+64 bytes from 10.0.0.1: icmp_seq=7 ttl=64 time=0.377 ms
+64 bytes from 10.0.0.1: icmp_seq=8 ttl=64 time=0.062 ms
+64 bytes from 10.0.0.1: icmp_seq=9 ttl=64 time=0.089 ms
+64 bytes from 10.0.0.1: icmp_seq=10 ttl=64 time=0.078 ms
+64 bytes from 10.0.0.1: icmp_seq=11 ttl=64 time=0.210 ms
+64 bytes from 10.0.0.1: icmp_seq=12 ttl=64 time=0.091 ms
+64 bytes from 10.0.0.1: icmp_seq=13 ttl=64 time=0.083 ms
+64 bytes from 10.0.0.1: icmp_seq=14 ttl=64 time=0.083 ms
+64 bytes from 10.0.0.1: icmp_seq=15 ttl=64 time=0.138 ms
+64 bytes from 10.0.0.1: icmp_seq=16 ttl=64 time=0.114 ms
+64 bytes from 10.0.0.1: icmp_seq=17 ttl=64 time=0.080 ms
+64 bytes from 10.0.0.1: icmp_seq=18 ttl=64 time=0.082 ms
+64 bytes from 10.0.0.1: icmp_seq=19 ttl=64 time=0.077 ms
+64 bytes from 10.0.0.1: icmp_seq=20 ttl=64 time=0.066 ms
+
+--- 10.0.0.1 ping statistics ---
+20 packets transmitted, 20 received, 0% packet loss, time 19469ms
+rtt min/avg/max/mdev = 0.062/0.243/1.889/0.411 ms
+
+# Testing from default NAMESPACE
+[user1@localhost ~]$ ping -c20 10.0.0.1
+PING 10.0.0.1 (10.0.0.1) 56(84) bytes of data.
+
+--- 10.0.0.1 ping statistics ---
+20 packets transmitted, 0 received, 100% packet loss, time 19513ms
+
+# Above ping failed, IP addresses on the same subnet for communication (10.0.0.0/24)
+[user1@localhost ~]$ sudo ip addr add 10.0.0.2/24 dev veth0
+
+[user1@localhost ~]$ sudo ip link set dev veth0 up
+
+[user1@localhost ~]$ ip addr
+6: veth0@if2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+    link/ether 56:c6:21:5f:11:b5 brd ff:ff:ff:ff:ff:ff link-netns mlops
+    inet 10.0.0.2/24 scope global veth0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::54c6:21ff:fe5f:11b5/64 scope link 
+       valid_lft forever preferred_lft forever
+
+
+[user1@localhost ~]$ ping -c20 10.0.0.1
+PING 10.0.0.1 (10.0.0.1) 56(84) bytes of data.
+64 bytes from 10.0.0.1: icmp_seq=1 ttl=64 time=0.248 ms
+64 bytes from 10.0.0.1: icmp_seq=2 ttl=64 time=0.124 ms
+64 bytes from 10.0.0.1: icmp_seq=3 ttl=64 time=0.160 ms
+64 bytes from 10.0.0.1: icmp_seq=4 ttl=64 time=0.098 ms
+64 bytes from 10.0.0.1: icmp_seq=5 ttl=64 time=0.170 ms
+64 bytes from 10.0.0.1: icmp_seq=6 ttl=64 time=0.115 ms
+64 bytes from 10.0.0.1: icmp_seq=7 ttl=64 time=0.112 ms
+64 bytes from 10.0.0.1: icmp_seq=8 ttl=64 time=0.139 ms
+64 bytes from 10.0.0.1: icmp_seq=9 ttl=64 time=0.135 ms
+64 bytes from 10.0.0.1: icmp_seq=10 ttl=64 time=0.154 ms
+64 bytes from 10.0.0.1: icmp_seq=11 ttl=64 time=0.107 ms
+64 bytes from 10.0.0.1: icmp_seq=12 ttl=64 time=0.127 ms
+64 bytes from 10.0.0.1: icmp_seq=13 ttl=64 time=0.119 ms
+64 bytes from 10.0.0.1: icmp_seq=14 ttl=64 time=0.118 ms
+64 bytes from 10.0.0.1: icmp_seq=15 ttl=64 time=0.159 ms
+64 bytes from 10.0.0.1: icmp_seq=16 ttl=64 time=0.139 ms
+64 bytes from 10.0.0.1: icmp_seq=17 ttl=64 time=0.090 ms
+64 bytes from 10.0.0.1: icmp_seq=18 ttl=64 time=0.088 ms
+64 bytes from 10.0.0.1: icmp_seq=19 ttl=64 time=0.095 ms
+64 bytes from 10.0.0.1: icmp_seq=20 ttl=64 time=0.118 ms
+
+--- 10.0.0.1 ping statistics ---
+20 packets transmitted, 20 received, 0% packet loss, time 19489ms
+rtt min/avg/max/mdev = 0.088/0.130/0.248/0.035 ms
+
+# Success this time
+
+# Look into ip route before the process and after the setup
+
+# Before
+[user1@localhost ~]$ ip route
+default via 192.168.28.2 dev ens160 proto dhcp src 192.168.28.129 metric 100 
+192.168.28.0/24 dev ens160 proto kernel scope link src 192.168.28.129 metric 100 
+
+
+# After
+[user1@localhost ~]$ ip route
+default via 192.168.28.2 dev ens160 proto dhcp src 192.168.28.129 metric 100 
+10.0.0.0/24 dev veth0 proto kernel scope link src 10.0.0.2 
+192.168.28.0/24 dev ens160 proto kernel scope link src 192.168.28.129 metric 100 
+
+````
+
+##### Route Tables
+
+Route tables replacing the route command and **netstat -nr** we can list route tables and add routes
+
+ip route show (or) ip ro sh (or) ip r
+
+*Adding a Static Route*
+
+We can add another IP address to the veth1 in the namespace. This is not accessible as we have no route to this network from the default namesapce. Adding the route via our local 10.0.0.2 address (Default namespace) will allow the network to be accessed.
+
+````bash
+# different subnet inside mlops NAMESPACE
+[user1@localhost ~]$ sudo ip netns exec mlops ip addr add 192.168.100.1/24 dev veth1
+
+[user1@localhost ~]$ sudo ip netns exec mlops ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+3: veth1@if7: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+    link/ether da:22:12:52:ba:81 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 10.0.0.1/24 scope global veth1
+       valid_lft forever preferred_lft forever
+    inet 192.168.100.1/24 scope global veth1
+       valid_lft forever preferred_lft forever
+    inet6 fe80::d822:12ff:fe52:ba81/64 scope link 
+       valid_lft forever preferred_lft forever
+
+# Ping from the default NAMESPACE
+[user1@localhost ~]$ ping -c5 192.168.100.1
+PING 192.168.100.1 (192.168.100.1) 56(84) bytes of data.
+
+--- 192.168.100.1 ping statistics ---
+5 packets transmitted, 0 received, 100% packet loss, time 4143ms
+
+# Adding route 
+[user1@localhost ~]$ sudo ip route add 192.168.100.0/24 via 10.0.0.2
+
+[user1@localhost ~]$ ping -c5 192.168.100.1
+PING 192.168.100.1 (192.168.100.1) 56(84) bytes of data.
+64 bytes from 192.168.100.1: icmp_seq=1 ttl=64 time=24.9 ms
+64 bytes from 192.168.100.1: icmp_seq=2 ttl=64 time=0.123 ms
+64 bytes from 192.168.100.1: icmp_seq=3 ttl=64 time=0.134 ms
+64 bytes from 192.168.100.1: icmp_seq=4 ttl=64 time=0.117 ms
+64 bytes from 192.168.100.1: icmp_seq=5 ttl=64 time=0.110 ms
+
+--- 192.168.100.1 ping statistics ---
+5 packets transmitted, 5 received, 0% packet loss, time 4062ms
+rtt min/avg/max/mdev = 0.110/5.079/24.912/9.916 ms
+
+[user1@localhost ~]$ ip route
+default via 192.168.28.2 dev ens160 proto dhcp src 192.168.28.129 metric 100 
+10.0.0.0/24 dev veth0 proto kernel scope link src 10.0.0.2 
+192.168.28.0/24 dev ens160 proto kernel scope link src 192.168.28.129 metric 100 
+```diff
++ 192.168.100.0/24 via 10.0.0.2 dev veth0
+```
+
+[user1@localhost ~]$ netstat -nr
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags   MSS Window  irtt Iface
+0.0.0.0         192.168.28.2    0.0.0.0         UG        0 0          0 ens160
+10.0.0.0        0.0.0.0         255.255.255.0   U         0 0          0 veth0
+192.168.28.0    0.0.0.0         255.255.255.0   U         0 0          0 ens160
+192.168.100.0   10.0.0.2        255.255.255.0   UG        0 0          0 veth0
+
+[user1@localhost ~]$ sudo ip netns exec mlops netstat -nr
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags   MSS Window  irtt Iface
+10.0.0.0        0.0.0.0         255.255.255.0   U         0 0          0 veth1
+192.168.100.0   0.0.0.0         255.255.255.0   U         0 0          0 veth1
+````
+
+This allows communication between branch office 1 and branch office 2 using Private IPs.
+
+
+### Persisting Network Configurations
 
 
 
