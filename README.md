@@ -4876,4 +4876,490 @@ sudo ip route add 192.168.100.0/24 via 10.0.0.2
 ### Persisting Network Configurations
 
 
+/etc/sysconfig/network-scripts # old, Previously NetworkManger stored **network profiles** in ifcfg format in this directory.
 
+/etc/NetworkManager/system-connections/ # new, NetworkManger stored **network profiles** in keyfile format in this directory.
+
+systemctl status NetworkManger
+
+use **nmcli** CLI command used to modify the files (Persisted)
+
+nmcli device 
+
+nmcli connection # software connection
+
+nmcli connection add type <CLICK TAB DOUBLE> # this provides connection types list
+
+
+````bash
+nmcli connection
+
+nmcli device
+
+# create new software connection
+[user1@localhost ~]$ sudo nmcli connection add type ethernet connection.interface-name eth0 ipv4.method manual ipv4.addresses 192.168.100.1/24 connection.id eth0
+
+# Modify configuration 
+[user1@localhost ~]$ sudo nmcli connection modify eth0 ipv4.method auto
+
+# Modify (removing the ipv4 addresses)
+[user1@localhost ~]$ sudo nmcli connection modify eth0 -ipv4.addresses 192.168.100.1/24
+
+# Connection up
+[user1@localhost ~]$ sudo nmcli connection up eth0
+
+# Connection down
+[user1@localhost ~]$ sudo nmcli connection down eth0
+
+# Delete the connection
+[user1@localhost ~]$ sudo nmcli connection delete eth0
+````
+
+**Adding DNS Server**
+
+It is possible that different connections will require different DNS or Gateway settings if not using DHCP. These too, can be part of the configuration.
+
+````text
+nmcli connection modify eth0 ipv4.dns 8.8.8.8
+````
+
+*DNS Server Priority*
+
+Having added the DNS server, it combines with another DNS server from ens160/eth0. To control this we can set a priority. The default priority will be 100 for standard connecctions and 50 for VPN connections. The lower +ve value wins so we need to set a lower value than 100 to be effective(priority).
+
+````text
+sudo nmcli connection modify eth0 ipv4.dns-priority 1
+
+sudo nmcli connection up eth0
+
+cat /etc/resolv.conf
+````
+
+For example, The first priority goes to 8.8.8.8 than another server/s in the /etc/resolv.conf. if an entry not found in the 8.8.8.8 (google server) than it queries the another server/s. To restrict this, use -ve priority values
+
+
+*DNS Server Priority - Overwrite*
+
+If we want a connections DNS server to overwrite others we can use a negative value.
+
+````text
+
+sudo nmcli connection modify eth0 ipv4.dns-priority -1
+
+sudo nmcli connection up eth0
+
+cat /etc/resolv.conf
+
+````
+
+Note: This could helpful to allow some connections public or private.
+
+
+
+````bash
+# Create a new NIC (Device)
+[user1@localhost ~]$ sudo ip link add eth0 type veth
+[user1@localhost ~]$ ip addr
+7: veth0@eth0: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default qlen 1000
+    link/ether ca:b4:4d:57:27:97 brd ff:ff:ff:ff:ff:ff
+8: eth0@veth0: <NO-CARRIER,BROADCAST,MULTICAST,UP,M-DOWN> mtu 1500 qdisc noqueue state LOWERLAYERDOWN group default qlen 1000
+    link/ether 1a:c2:15:b2:cc:23 brd ff:ff:ff:ff:ff:ff
+
+# Add IP Address
+[user1@localhost ~]$ sudo ip addr add 10.0.0.1/24 dev eth0
+
+[user1@localhost ~]$ ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: ens160: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
+    link/ether 00:0c:29:7b:e2:62 brd ff:ff:ff:ff:ff:ff
+    altname enp3s0
+    inet 192.168.28.129/24 brd 192.168.28.255 scope global dynamic noprefixroute ens160
+       valid_lft 1758sec preferred_lft 1758sec
+    inet6 fe80::20c:29ff:fe7b:e262/64 scope link noprefixroute 
+       valid_lft forever preferred_lft forever
+7: veth0@eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+    link/ether ca:b4:4d:57:27:97 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::c8b4:4dff:fe57:2797/64 scope link 
+       valid_lft forever preferred_lft forever
+8: eth0@veth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+    link/ether 1a:c2:15:b2:cc:23 brd ff:ff:ff:ff:ff:ff
+
+# Status UP
+[user1@localhost ~]$ sudo ip link set dev eth0 up
+
+
+# Check Devices
+[user1@localhost ~]$ sudo nmcli device
+DEVICE  TYPE      STATE                   CONNECTION 
+ens160  ethernet  connected               ens160     
+lo      loopback  connected (externally)  lo         
+eth0    ethernet  connected (externally)  eth0       
+veth0   ethernet  unmanaged               --    
+
+
+# Check the connections
+[user1@localhost ~]$ sudo nmcli connection
+NAME    UUID                                  TYPE      DEVICE 
+ens160  241a8be7-7541-334d-900b-ae6482ec9e44  ethernet  ens160 
+lo      0fbdfb7f-7938-43a0-b852-70f61c37af5c  loopback  lo     
+eth0    b399036d-bf53-44bb-9c43-31210386c82e  ethernet  eth0   
+
+
+
+# Create network profile for eth0
+
+[user1@localhost ~]$ sudo ls -l /etc/NetworkManager/system-connections/
+total 4
+-rw-------. 1 root root 229 Nov  9 15:55 ens160.nmconnection
+
+[user1@localhost ~]$ sudo nmcli connection add type ethernet connection.interface-name eth0 ipv4.method auto connection.id eth0
+Warning: There is another connection with the name 'eth0'. Reference the connection by its uuid '418d775b-f338-4042-b76a-feecdd46428d'
+Connection 'eth0' (418d775b-f338-4042-b76a-feecdd46428d) successfully added.
+
+
+[user1@localhost ~]$ sudo ls -l /etc/NetworkManager/system-connections/
+total 8
+-rw-------. 1 root root 229 Nov  9 15:55 ens160.nmconnection
+-rw-------. 1 root root 180 Nov 28 14:52 eth0.nmconnection
+
+
+[user1@localhost ~]$ sudo nmcli connection up eth0
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/14)
+
+
+[user1@localhost ~]$ sudo nmcli device
+DEVICE  TYPE      STATE                   CONNECTION 
+ens160  ethernet  connected               ens160     
+eth0    ethernet  connected               eth0       
+lo      loopback  connected (externally)  lo         
+veth0   ethernet  unmanaged               --   
+
+
+[user1@localhost ~]$ sudo nmcli connection
+NAME    UUID                                  TYPE      DEVICE 
+ens160  241a8be7-7541-334d-900b-ae6482ec9e44  ethernet  ens160 
+eth0    b399036d-bf53-44bb-9c43-31210386c82e  ethernet  eth0   
+lo      0fbdfb7f-7938-43a0-b852-70f61c37af5c  loopback  lo     
+eth0    418d775b-f338-4042-b76a-feecdd46428d  ethernet  --  
+
+[user1@localhost ~]$ sudo cat /etc/NetworkManager/system-connections/eth0.nmconnection 
+[connection]
+id=eth0
+uuid=418d775b-f338-4042-b76a-feecdd46428d
+type=ethernet
+interface-name=eth0
+
+[ethernet]
+
+[ipv4]
+method=auto
+
+[ipv6]
+addr-gen-mode=default
+method=auto
+
+[proxy]
+
+
+[user1@localhost ~]$ sudo cat /etc/resolv.conf 
+# Generated by NetworkManager
+search localdomain
+nameserver 192.168.28.2
+
+
+## DNS Priority
+[user1@localhost ~]$ sudo nmcli connection modify eth0 ipv4.dns 8.8.8.8
+
+[user1@localhost ~]$ sudo cat /etc/resolv.conf 
+# Generated by NetworkManager
+search localdomain
+nameserver 192.168.28.2
+nameserver 8.8.8.8
+
+
+[user1@localhost ~]$ sudo nmcli connection modify eth0 ipv4.dns-priority 1
+
+
+[user1@localhost ~]$ sudo nmcli connection up eth0
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/18)
+
+[user1@localhost ~]$ sudo cat /etc/resolv.conf 
+# Generated by NetworkManager
+search localdomain
+nameserver 8.8.8.8
+nameserver 192.168.28.2
+
+# -ve value
+[user1@localhost ~]$ sudo nmcli connection modify eth0 ipv4.dns-priority -1
+
+[user1@localhost ~]$ sudo nmcli connection up eth0
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/19)
+
+[user1@localhost ~]$ sudo cat /etc/resolv.conf 
+# Generated by NetworkManager
+nameserver 8.8.8.8
+
+````
+
+### Configuring Firewalls and understanding Fail2Ban
+
+#### Securing your system via Host based firewall
+
+- firewalld
+  + firewall-cmd
+  + firewall zones
+  + configuration rules
+
+- Fail2Ban
+  + Installing Fail2Ban
+  + Securing systems automatically
+
+
+Note: **Belt and Brace approach to secuirty**
+
+The default firewall in RHEL 8 is managed via **FirewallD**.
+
+- In RHEL 7 the backed was **IPTables**
+
+- In RHEL 8 the backed is **NFTables** -> (Kernel based firewall)
+
+
+##### FirewallD
+
+To manage the backend firewalld firewall we use the command **firewall-cmd** as the root user.
+
+sudo firewall-cmd --state
+
+
+sudo systemctl enable --now <> # if it not running
+
+sudo firewall-cmd --list-all # listing **runtime configurations** from our default zone
+
+sudo firewall-cmd --list-all --permanent # listing **persisted configurations** from our default zone
+
+sudo firewall-cmd --get-default-zone # prints the default zone
+
+sudo firewall-cmd --info-service=sshd
+
+
+**XML based configuration files**
+
+Default settings come from **/usr/lib/firewalld**
+
+**/etc/firewalld** used to store edited configurations (custom)
+
+
+**Adding Services**
+
+Many common services will have an XML file representing their needs, we add these files to the configuration using **--add-service**. We can persist the settings with **--permanent**
+
+sudo firewall-cmd --permanent --add-service=http
+
+sudo firewall-cmd --info-service=http
+
+sudo firewall-cmd --remove-service=http
+
+*ports and timeouts*
+
+Timeouts used with firewall rules, the units, default to seconds.
+
+firewall-cmd --add-ports=443/tcp --timeout=30
+
+Create custom configuration file for http by copying from default file
+
+sudo cp /usr/lib/firewalld/services/http.xml /etc/firewalld/services/
+
+sudo vim /etc/firewalld/services/http.xml
+
+  <port protocol="tcp" port="443"/>
+
+sudo firewall-cmd --reload
+
+sudo firewall-cmd --info-service=http
+
+
+**Sources and Zones**
+
+Sources represent inbound connections. We can add a source to a zone to trust or block connections.
+
+
+sudo firewall-cmd --add-service=http --zone=internal
+
+sudo firewall-cmd --list-all --zone=internal # check zone internal have any interfaces (NICs)
+
+if zone doesn't havee any interfaces, than another way is add source to zone
+
+sudo firewall-cmd --add-source=192.168.33.12/24 --zone=internal
+
+note: 192.168.33.12/24 -> request server subnet, you can add server IP
+
+sudo firewall-cmd --list-all --zone=internal
+
+make change persistant after testing
+
+
+##### Fail2Ban
+
+fail2ban is the python package (python based service) designed to look for malicious login attempts and block the IP address from host access.
+
+In RHEL, fail2ban can be installed from the EPEL repository
+
+sudo yum install <epel repo>
+
+sudo yum install fail2ban
+
+
+sudo /etc/fail2ban/jail.d/sshd.conf
+
+````yaml
+[DEFAULT]
+bantime = 48h
+findtime = 10m
+maxretry = 4
+backend = auto
+
+[sshd]
+enabled = true
+````
+
+sudo yum install systemctl enable --now fail2ban
+
+fail2ban-client status sshd
+
+
+### Configuring Firewalls using NFTables
+
+Nfttables are managed bz firewalld. On startup of the firewalld service, tables are created in each of the protocol families. We can manage both ip4 and ipv6 rules with the inet protocol familiy.
+
+
+#### Basic commands
+
+- How to list the default rulesets?
+- How to list the default tables?
+- How to see the details inside the table?
+
+
+````bash
+
+systemctl disable --now firewalld
+
+firewall-cmd --state
+
+nft list ruleset # list the ruleset existed or not after firewalld service stopped and disabled.
+
+nft list tables
+
+nft flush ruleset # if exist, drop any existing nftables ruleset
+
+systemctl enable --now firewalld
+
+nft list ruleset
+
+nft list tables
+
+  [user1@localhost ~]$ sudo nft list tables
+  table inet firewalld
+  
+  output syntax: <table> <protocol family> <table name>
+
+
+nft list table inet firewalld # check the content inside the table
+
+````
+
+Note: 
+
+- inet protocol family is very useful to combine IPv4 and IPv6 rule sets in a single place.
+- The default the tables consumes the memory because the rules are stored in the memory. we can create custom tables and chain (rules) to system resources by only adding what we required.
+
+#### Creating a Table and Chain
+
+Tables and chains are the basis of firewall rules. disabling firewalld and rebooting the system will allow us to uild everything from scratch. using **inet** as the familiy we can work with both IPv4 and IPv6.
+
+````bash
+systemctl disable --now firewalld
+
+nft flush ruleset # To drop any existing nftables ruleset
+
+nft list tables
+
+nft add table inet filter
+
+nft add chain inet filter INPUT { type filter hook input priority 0 \; policy accept \;}
+
+nft list tables
+
+nft list ruleset
+````
+
+Basic chain types:
+
+- filter (packet filtering)
+- route 
+- nat
+
+chain contains set of rules linked together.
+
+
+Basic Hook types:
+
+- prerouting
+- input
+- forward
+- output
+- postrouting
+- ingress
+
+
+**Building a basic Nftables Firewall**
+
+If we need inbound SSH connection to the system a basic firewall is not that different to the one that we would build with **iptables** but working with both IPv4 and IPv6 (inet)
+
+````bash
+nft add rule inet filter INPUT iif lo accept # accepting local network (lo -> loopback, iif -> interface)
+
+nft add rule inet filter INPUT ct state established, related accept # ct -> connection
+
+nft add rule inet filter INPUT tcp dport 22 accept # dport -> destination port
+
+nft add rule inet filter INPUT counter drop # drop the packets, if not matched with rules defined above
+
+nft list ruleset
+
+nft list table inet filter
+````
+
+#### Persisting nftables rules
+
+we can list the complete ruleset and redirect to a file. we can then flush the table. clearing all associated chains and delete the table. Reestablishing rules by reading the file back with the option **-f**
+
+
+nft list ruleset > /root/myrules
+
+nft flush ruleset
+
+nft -f /root/myrules
+
+
+**Nfttables Service**
+
+The systemd service unit for nftables used the file **/etc/sysconfig/nftables.conf** as it source for rules.
+
+````bash
+sudo cat  /etc/sysconfig/nftables.conf
+
+nft list ruleset > /etc/sysconfig/nftables.conf
+
+nft flush ruleset # To drop any existing nftables ruleset
+
+nft flush table inet filter # To drop only the table from the ruleset
+
+nft delete table inet filter
+
+systemctl enable --now nftables
+````
