@@ -5192,11 +5192,11 @@ sudo firewall-cmd --add-service=http --zone=internal
 
 sudo firewall-cmd --list-all --zone=internal # check zone internal have any interfaces (NICs)
 
-if zone doesn't havee any interfaces, than another way is add source to zone
+if zone doesn't have any interfaces, than another way is add source to zone
 
 sudo firewall-cmd --add-source=192.168.33.12/24 --zone=internal
 
-note: 192.168.33.12/24 -> request server subnet, you can add server IP
+note: 192.168.33.12/24 -> request server subnet, you can add only server IP you want allow
 
 sudo firewall-cmd --list-all --zone=internal
 
@@ -5227,7 +5227,7 @@ backend = auto
 enabled = true
 ````
 
-sudo yum install systemctl enable --now fail2ban
+sudo systemctl enable --now fail2ban
 
 fail2ban-client status sshd
 
@@ -5321,6 +5321,22 @@ Basic Hook types:
 If we need inbound SSH connection to the system a basic firewall is not that different to the one that we would build with **iptables** but working with both IPv4 and IPv6 (inet)
 
 ````bash
+systemctl disable --now firewalld
+
+nft list ruleset
+
+nft list tables
+
+nft flush ruleset # To drop any existing nftables ruleset
+
+nft list tables
+
+nft add table inet filter # create a new table
+
+# Adding chain to the table
+nft add chain inet filter INPUT { type filter hook input priority 0 \; policy accept \;}
+
+# Adding rule inside chain
 nft add rule inet filter INPUT iif lo accept # accepting local network (lo -> loopback, iif -> interface)
 
 nft add rule inet filter INPUT ct state established, related accept # ct -> connection
@@ -5363,3 +5379,216 @@ nft delete table inet filter
 
 systemctl enable --now nftables
 ````
+
+
+## Module 08 - Managing Users and Groups
+
+### Managing Linux Users
+
+#### List and create Users
+
+**Listing Users**
+
+/etc/passwd is the local user account database
+
+getent passwd user01
+
+man 5 passwd
+
+less /etc/nsswitch.conf # name service switch file
+
+
+cut -f1,3 -d: /etc/passwd | grep user01 # Filter info
+
+awk -F: '/user01/{ print $1 " " $3}' /etc/passwd
+
+
+useradd -D # Check the default options (or) cat /etc/default/useradd
+
+grep -E '^(CREATE_HOME|USERGROUPS_ENAB)' /etc/login.defs
+
+
+**User Groups Types**
+
+- **Primary Group** -> /etc/passwd. Affects the group ownership of new files created by the user.
+- **Complimentary Groups / Secondary Groups** -> /etc/group. Affects the rights that a user has to resources and includes the users primary group.
+
+
+**Create Users**
+
+Create Users with Non-Default settings:
+
+-M -> no home directory
+
+-N specifies not to create a user group, the primary group will now be from the defaults.
+
+The option -G allows us to specify complimentary groups, here we add the user to the wheel group.
+
+The option -c allows the setting of the full name or user comment.
+
+useradd -M -N -G wheel -c 'user two' user02
+
+id user02
+
+getent passwd user02
+
+
+#### Manage user accounts [useradd, userdel, usermod]
+
+**modify user** 
+
+useradd user02
+
+usermod -c 'user two' -g users -aG wheel user02
+
+g -> primary group 
+
+find /home /var -nouser # check user02 related files existed or not
+
+userdel user02
+
+find /home /var -nouser # check user02 related files existed or not
+
+find /home /var -nouser -delete
+
+userdel -r user02 # -r deletes the home director, mail spool files and user cron jobs
+
+find /home /var -nouser
+
+
+#### Managing User Passwords [/etc/passwd, /etc/shadow, /etc/login.defs, chage, openssl passwd, ]
+
+[user1@localhost ~]$ cat /etc/passwd | grep user1
+user1:x:1000:1000:user1:/home/user1:/bin/bash
+
+x -> the password field and doesn't allow shadow (aging) data.
+
+
+The passwords stored in **/etc/shadow** and allow shadow.
+
+<<add image>>
+
+Default Password Aging controls:
+
+The file **/etc/login.defs** allows for configuration of **default aging settings**
+
+
+**chage**
+
+Using the command chage (change age) a user can see their own shadow data, root can see and changee all shadow data.
+
+````bash
+man 5 shadow
+
+[user1@localhost ~]$ chage --list $USER
+Last password change					: never
+Password expires					: never
+Password inactive					: never
+Account expires						: never
+Minimum number of days between password change		: 0
+Maximum number of days between password change		: 99999
+Number of days of warning before password expires	: 7
+
+
+[user1@localhost ~]$ sudo cat /etc/shadow | grep user1
+
+user1:$6$SzL8RjLkKmZV//mm$O55ufK11wbzhmLK83pCMxGuv8GcoexHtfiBNysNwUGe3Fn/J59aqbWhw4whuUXBTCw3glE6BqFk/rzZYbl4PN.::0:99999:7:::
+
+[user1@localhost ~]$ sudo getent shadow user1
+
+user1:$6$SzL8RjLkKmZV//mm$O55ufK11wbzhmLK83pCMxGuv8GcoexHtfiBNysNwUGe3Fn/J59aqbWhw4whuUXBTCw3glE6BqFk/rzZYbl4PN.::0:99999:7:::
+
+sudo chage -M 99999 -m 0 -E -1 -I -1 user1
+
+-M -> Maximum number of days between password change
+
+-m -> Minimum number of days between password change
+
+-E -> Account expiration
+
+-I -> Inactive period
+
+````
+The passwords are stored within the second field of the shadow file. The entry itself is broken down 3 separate entities: the algorithm, the SALT and the password hash
+
+````bash
+[user1@localhost ~]$ sudo getent shadow user1 | awk -F$ '{ print "alg: " $2 "\nsalt: " $3 "\npwd: " $4}'
+
+alg: 6
+salt: SzL8RjLkKmZV//mm
+pwd: O55ufK11wbzhmLK83pCMxGuv8GcoexHtfiBNysNwUGe3Fn/J59aqbWhw4whuUXBTCw3glE6BqFk/rzZYbl4PN.::0:99999:7:::
+
+````
+
+**Modifying default password aging controls**
+
+````bash
+sudo vim /etc/login.defs
+
+  # Password aging controls:
+  #
+  #       PASS_MAX_DAYS   Maximum number of days a password may be used.
+  #       PASS_MIN_DAYS   Minimum number of days allowed between password changes.
+  #       PASS_MIN_LEN    Minimum acceptable password length.
+  #       PASS_WARN_AGE   Number of days warning given before a password expires.
+  #
+  PASS_MAX_DAYS   99999
+  PASS_MIN_DAYS   0
+  PASS_WARN_AGE   7
+````
+Note: changing the default password aging controls will not effect the existing users. The new changes applicable to the users are created after modification.
+
+
+**Undersatnding Password Authentication**
+
+we already know about 3 seperate entities inside the password field.
+
+Passwords are one way password hashes. They can't be decrypted. **Authentication occurs by comparing hash values**. If the correct password is supplied the same hash will be produced with when combined with the same SALT.
+
+Authentication proccess using **openssl** command
+
+````bash
+[user1@localhost ~]$ sudo getent shadow user1 | awk -F$ '{ print "alg: " $2 "\nsalt: " $3 "\npwd: " $4}'
+
+alg: 6
+salt: SzL8RjLkKmZV//mm
+pwd: O55ufK11wbzhmLK83pCMxGuv8GcoexHtfiBNysNwUGe3Fn/J59aqbWhw4whuUXBTCw3glE6BqFk/rzZYbl4PN.::0:99999:7:::
+
+user1@localhost ~]$ openssl passwd -6 -salt SzL8RjLkKmZV//mm <user1 password>
+$6$SzL8RjLkKmZV//mm$O55ufK11wbzhmLK83pCMxGuv8GcoexHtfiBNysNwUGe3Fn/J59aqbWhw4whuUXBTCw3glE6BqFk/rzZYbl4PN.
+````
+
+
+**Managing Password**
+
+echo 'user2passwd' | sudo passwd u2 --stdin
+
+For Debian and RedHat based systems, **chpasswd** command is useful for non-interactive password setting. For other distributions **passwd**
+
+chpasswd - update passwords in batch mode
+
+echo "u2:user2@pass" | sudo chpasswd # for single user
+
+````text
+# Batch users
+sudo vim users
+
+  u1:user1passwd
+  u2:user2passwd
+  .
+  .
+  u100:user100passwd
+
+cat users | sudo chpasswd
+````
+
+passwd command is also useful for locking users account, perhaps while they are on vacation.
+
+-l -> to lock
+
+-S -> to check status
+
+-u -> to unlock
+
+
+
