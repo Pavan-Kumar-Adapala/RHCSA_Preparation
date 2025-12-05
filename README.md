@@ -28,15 +28,15 @@ Types of Hypervisors?
 
 There are 2 types of hypervisors:
 
-![Types of hypervisors](../imgs/hypervisor_types.png)
+![Types of hypervisors](./imgs/hypervisor_types.png)
 
 1. type 1 hypervisor (Bare metal or native)
 
-![Type 1 hypervisor](../imgs/type1_hypervisor.png)
+![Type 1 hypervisor](./imgs/type1_hypervisor.png)
 
 2. type 2 hypervisor (Hosted Hypervisor)
 
-![Type 2 hypervisor](../imgs/type2_hypervisor.png)
+![Type 2 hypervisor](./imgs/type2_hypervisor.png)
 
 ---
 
@@ -551,7 +551,7 @@ A file system is a method that the operating system uses to:
 - **Store and organize data** on storage devices (like HDDs, SSDs, USB drives).
 - **Manage how data** is read, written, and accessed.
 
-![Linux file system](../imgs/Linux_FS_abilities.png)
+![Linux file system](./imgs/Linux_FS_abilities.png)
 
 
 Note:
