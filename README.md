@@ -28,30 +28,15 @@ Types of Hypervisors?
 
 There are 2 types of hypervisors:
 
+![Types of hypervisors](../imgs/hypervisor_types.png)
+
 1. type 1 hypervisor (Bare metal or native)
 
-    ------------------------
-    | vm1 |  vm2  | ... vmn
-    ------------------------
-      hypervisor 
-      (VMWare ESXi, Hyper-V)
-    ------------------------
-      Hardware resources
-    ------------------------
+![Type 1 hypervisor](../imgs/type1_hypervisor.png)
 
 2. type 2 hypervisor (Hosted Hypervisor)
 
-    ------------------------
-    | vm1 |  vm2  | ... vmn
-    ------------------------
-      hypervisor 
-      (VMWare Workstation, 
-      Oracle vm Virtual box)
-    ------------------------
-          Host OS
-    ------------------------
-      Hardware resources
-    ------------------------
+![Type 2 hypervisor](../imgs/type2_hypervisor.png)
 
 ---
 
@@ -291,7 +276,7 @@ websvc ALL=(ALL) NOPASSWD: /bin/systemctl restart httpd, /bin/systemctl status h
 Now you can safely run:
 
 ```bash
-sudo -u websvc sudo systemctl restart httpd
+sudo -u websvc systemctl restart httpd
 ```
 
 This allows automation tools (like Ansible, Jenkins, or cron) to restart the service **without giving full root access**.
@@ -565,6 +550,9 @@ A file system is a method that the operating system uses to:
 
 - **Store and organize data** on storage devices (like HDDs, SSDs, USB drives).
 - **Manage how data** is read, written, and accessed.
+
+![Linux file system](../imgs/Linux_FS_abilities.png)
+
 
 Note:
 
@@ -5590,5 +5578,342 @@ passwd command is also useful for locking users account, perhaps while they are 
 
 -u -> to unlock
 
+sudo passwd -S user1
 
+
+### Managing Groups
+
+- groupadd
+- /etc/group -> the group database
+- getent group
+
+**List all users belong to the same groupID**
+
+gid=$(awk -F: '/^wheel/ { print $3 }' /etc/group)
+
+echo $gid
+
+awk -F: -v gid=$gid 'gid == $4 { print $0 }' /etc/passwd
+
+
+usermod -g -G
+
+usermod -aG
+
+-g -> primary group
+
+-G -> secondary group
+
+-a -> append
+
+**Group Passwords**
+
+Adding a group passwords will make your group less secure NOT more secure. That said the **gpasswd** command has more uses.
+
+A group with a password becomes a **self-service group**. User can *become a member of the group* if they *know the group password*.
+
+
+**About gpasswd**
+
+gpasswd command does more than set the group password. It can be used to set group administrators with the option -A. The administrator is stored in the **/etc/gshadow** file.
+
+sudo gpasswd -a <user> <group> # append user to group
+
+sudo gpasswd -A <user> <group> # Administrative access to the user
+
+
+### Elevating Privileges in Linux
+
+
+su - substitute user
+
+  Switch to root account:
+
+    su # non login shell
+
+    su - (or) su -l # full login shell
+
+
+  Switch to user:
+
+    su - user1
+
+sudo
+
+  sudo -i
+
+/etc/sudoers # default/main file and **sudo visudo** coomand used to edit the file
+
+/etc/sudoers.d/ # extension directory and **sudo visudo -f /etc/sudoers.d/user1** useful to create custom settings
+
+visudo -c # c -> for checking
+
+
+How to use different editor:
+
+sudo -i
+
+EDITOR=nano visudo # you need to type EDITOR=nano before file you want to edit
+
+visudo -f /etc/sudoers.d/defaults
+
+  Defaults env_keep += "EDITOR"
+
+su - user1
+
+sudo visudo # now it open in nano editor, if not working type **export EDITOR** command
+
+
+## Module 09 - Managing Security in Linux
+
+### Implementing SSH key-based Authentication
+
+SSH key authentication is a secure way to log in to remote systems without typing a password. It works by using **a key pair**:
+
+* **Public key** → goes on the *remote server*
+* **Private key** → stays securely on *your local machine* (never shared)
+
+Once set up, SSH proves your identity using cryptography instead of passwords.
+
+#### Concepts to know before
+
+**Authenticating Servers**
+
+  We have probably become used to the *~/.ssh/known_host* file. THis is the public key of servers that we have connected to. If you have a remote server available the public key will be added to the known hosts file the first time you connect.
+
+  When you connect to an SSH server for the first time, you get this message:
+
+  ```
+  The authenticity of host 'example.com' can't be established...
+  Are you sure you want to continue connecting (yes/no)?
+  ```
+
+  If you say **yes**, the server’s **public host key** is stored in:
+
+  ```
+  ~/.ssh/known_hosts
+  ```
+
+  This file stores fingerprints of servers you trust.
+
+
+**Generate SSH keys for user [This is done in the client end]**
+
+  The Command *ssh-keygen* will create a key-pair. Setting a passphrase secures the private key.
+
+
+  You generate your own key pair using:
+
+  ```
+  ssh-keygen
+  ```
+
+  This creates:
+
+  * **Private key** → `~/.ssh/id_rsa` (or ed25519, etc.)
+  * **Public key** → `~/.ssh/id_rsa.pub`
+
+  Optional but recommended: add a **passphrase** to secure the private key.
+
+  To see available key types:
+
+  ```
+  ssh-keygen -t
+  ```
+
+  Common types:
+
+  * `ed25519` (modern, recommended)
+  * `rsa`
+  * `ecdsa`
+
+**Copy Key**
+
+  To enable key-based login, your **public key** must be placed in **~/.ssh/authorized_keys** on the **remote server** under the user account you want to log into.
+
+  The easiest way to copy it:
+
+  ```
+  ssh-copy-id -i ~/.ssh/id_ed25519.pub user@hostname # If password authentication is enabled on the server, this works smoothly.
+  ```
+
+  If password authentication is disabled:
+
+  You must already have some way of accessing the server (another user with key access) to manually copy the public key into:
+
+  ```
+  /home/<user>/.ssh/authorized_keys
+  ```
+
+  On the remote server:
+
+  ```
+  cat ~/.ssh/authorized_keys
+  ```
+
+  **Local machine (client)**
+
+  * Stores **private key**
+  * Stores its own **public key**
+
+  **Remote machine (server / VM)**
+
+  * Stores a copy of the **client’s public key** (in `authorized_keys`)
+  * Stores the **server’s own host private key**, used to identify itself
+
+#### Cache Passphrase and config file
+
+**Cache Passphrase [inside client]**
+
+SSH keys with passphrases are more secure, but they require you to enter the passphrase every time you use the key.
+
+To avoid typing the passphrase repeatedly, you can use **ssh-agent**, which securely stores decrypted private keys in memory for your session.
+
+  ```
+  eval $(ssh-agent) 
+
+  This starts the ssh-agent process, sets environment variables (SSH_AGENT_PID, SSH_AUTH_SOCK) in your shell, and allows your shell to communicate with the agent
+
+  ssh-add 
+
+  The agent keeps the key unlocked in memory, SSH connections using that key will not ask for the passphrase again, and until you reboot or kill the agent
+  ```
+
+**Another approach to Cache Passphrase ** using Configuration file with Host entries** [inside client] **
+
+vim .ssh/config
+
+  Host *
+    IdentityFile ~/.ssh/id_rsa # private key
+    ServerAliveInterval 300
+    ServerAliveCountMax 2
+  Host remote
+    Hostname <Hostname or IP of remote VM>
+    User <username>
+
+chmod 600 .ssh/config
+
+connection test:
+
+  ssh <username>@remote
+
+
+#### Disable SSH Password Authentication
+
+sudo sshd -T # Reading current settings/configurations
+
+sudo sshd -T | grep passwordauthentication
+
+
+sudo vim /etc/ssh/sshd_config
+
+  PasswordAuthentication no
+
+
+### Implementing POSIX Access Control Lists (ACLs)
+
+Before talking about ACLs. First we should understand the *UNIX file mode limitations*.
+
+Unix File mode:
+
+- The Unix file mode was never designed for enterprise file sharing
+
+- Allowing for a single user, single group, and everyone else
+
+- You can jsut keep creating groups to meet new needs in the file system
+
+- Even so, this does not cater for when a group requires read access and another group requires read-write access to the same file or directory
+
+ACLs overcome these limitations
+
+#### ACLs
+
+ACL types:
+
+- POSIX
+- NFS
+- CIFS
+
+
+````bash
+
+df -hT / # check the file type (xfs type have ACL support by default)
+
+# Kernel support
+[user1@localhost ~]$ grep -i acl /boot/config-$(uname -r)
+CONFIG_EXT4_FS_POSIX_ACL=y
+CONFIG_XFS_POSIX_ACL=y
+CONFIG_FS_POSIX_ACL=y
+CONFIG_TMPFS_POSIX_ACL=y
+CONFIG_EROFS_FS_POSIX_ACL=y
+CONFIG_NFS_V3_ACL=y
+CONFIG_NFSD_V3_ACL=y
+CONFIG_NFS_ACL_SUPPORT=m
+CONFIG_CEPH_FS_POSIX_ACL=y
+
+# Check underlying packages in ACL
+[user1@localhost ~]$ sudo yum list acl
+Updating Subscription Management repositories.
+Last metadata expiration check: 0:18:44 ago on Fri 05 Dec 2025 12:22:34 PM CET.
+Installed Packages
+acl.x86_64                                                                                           2.3.1-4.el9                                                                                           @anaconda
+
+[user1@localhost ~]$ rpm -qf $(which getfacl)
+acl-2.3.1-4.el9.x86_64
+
+````
+
+**POSIX ACLs:**
+
+These ACLs *allow for more than one user or group to have the same or similar permissions to a file resource*. We can also *set default permissions* allowing new files or directories to inherit from the parent.
+
+**Default ACLs:**
+
+These can be *applied only to directories*. Useful to *ensure services can maintain the correct access to files* whilst restricting others. 
+
+Setting the default ACL on the Apache DocumentRoot will not affect existing content. create your own new index page and the permissions will be correct
+
+```
+sudo yum install -y httpd
+
+[user1@localhost ~]$ sudo ls -la /var/www/html
+total 0
+drwxr-xr-x. 2 root root  6 Aug 18 12:04 .
+drwxr-xr-x. 4 root root 33 Dec  5 13:12 ..
+
+getent passwd apache
+
+[user1@localhost ~]$ sudo setfacl -m d:u:apache:r,d:o:- /var/www/html
+
+setfacl <rules> <files>
+
+-m -> modifies the ACL
+
+-x -> remove the ACL entry
+
+d: -> default ACL
+
+u -> user
+
+o -> other
+
+g -> group
+
+rule 1 -> d:u:apache:r
+
+rule 2 -> d:o:-
+
+[user1@localhost ~]$ echo "Hello" | sudo tee /var/www/html/index.html
+Hello
+
+[user1@localhost ~]$ sudo ls -la /var/www/html
+total 4
+drwxr-xr-x+ 2 root root 24 Dec  5 13:17 .
+drwxr-xr-x. 4 root root 33 Dec  5 13:12 ..
+-rw-r-----+ 1 root root  6 Dec  5 13:17 index.html
+
+getfactl /var/www/html/index.html
+
+ls -l /var/www/html/index.html
+```
 
