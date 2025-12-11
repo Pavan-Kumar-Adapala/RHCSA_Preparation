@@ -5916,4 +5916,129 @@ getfactl /var/www/html/index.html
 
 ls -l /var/www/html/index.html
 ```
+Question:
 
+What is the difference between Special file permissions and ACLs?
+
+
+### SELinux
+
+What is SELinx?
+
+SELinux is a Mandatory Access Control system(MAC), unlike file mode or file access control lists (are discretionary access control list).
+
+SELinux security system originally developed by the National Security Agency.
+
+Note:
+
+```
+Many services run with root access in any Linux system. SELinux controls these processes, even though they may be running as root user.
+```
+
+**Understanding Security**
+
+File mode: File system security needs to be adjusted to *allow correct access to directories*
+
+Access control lists: Firewalls need to be adjusted to *control correct access to the network*
+
+SELinux: It needs to be adjusted 
+
+
+#### SELinux Modes
+
+SELinux has 3 operating modes:
+
+1. Enforcing: Rules are enforced and violations are logged
+
+2. Permissive: No rule enforcement but violations are logged
+
+- Using this mode, we progressively correcting any of our issues
+
+3. Disabled: SELinux not operational and no logging
+
+```
+# Reading Current mode of SELinx
+
+getenforce
+
+sestatus
+
+cat /etc/selinux/config
+
+mount | grep selinux
+
+```
+
+#### Runtime configuration and Presistance configuration Modifications
+
+```
+# Runtime configuration SELinux mode changing
+
+setenforce -> used to change the modes *from Permissive to Enforcing* or *from Enforcing to Permissive*
+
+For *Disabling* change in /etc/selinux/config and than restart the system
+
+sudo setenforce --help 
+
+sudo setenforce Permissive or sudo setenforce 0
+
+sestatus
+
+sudo setenforce Enforcing or sudo setenforce 1
+
+sestatus
+
+# Presistance configuration SELinux mode changing
+
+/etc/selinux/config
+
+```
+
+#### Installing Tools to manage SELinux
+
+```
+sudo yum install -y policycoreutils setools setools-console setroubleshoot
+```
+
+#### Preventing Runtime changes to SELinx mode
+
+**Miscreant Administrators**
+
+An administrator may quickly change the SElinux mode to allow something to happen that is not permitted. 
+
+To avoid the above situations:
+
+Setting the SELinux Boolean will require a reboot of the system to change the SELinx mode.
+
+Use the option -P to persist the change
+
+```
+# listout all booleans
+
+getsebool -a 
+
+sudo semanage boolean --list 
+
+sudo semanage boolean --list | grep -i secure_mode
+
+# To set boolean in Runtime and Persistant
+
+
+sudo setsebool secure_mode_policyload on # runtime change
+
+sudo setenforce 0
+
+sudo setsebool secure_mode_policyload on (-P) # Persistant
+
+```
+
+#### SELiunx Kernel Options
+
+selinux=0 -> Disable SELinux, Generally the wrong option (not do it)
+
+enforcing=0 -> set SELinux into permissive mode, great if there are SELinx issues causing authentication issues
+
+autorelabel=1 -> causes all files to receive the SELinux labels that should be assigned to them, again can be good to resolve SELinux boot and authentication issues
+
+
+### 
