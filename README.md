@@ -6041,4 +6041,118 @@ enforcing=0 -> set SELinux into permissive mode, great if there are SELinx issue
 autorelabel=1 -> causes all files to receive the SELinux labels that should be assigned to them, again can be good to resolve SELinux boot and authentication issues
 
 
-### 
+### (SELinux) Understanging File and Process contexts
+
+SELinux label & SELinux type: to check the availalbe types and labels
+
+cat /etc/selinx/config
+
+
+**SELINUX Modifications**
+
+SELinux works with something called *type enforcement*. The SELinux type of a *source domain or process must be compatible with the target SELinux type.* If we need to *customize content* or if we make erroneous changes operations may not work.
+
+#### About Contexts
+
+**List Contexts**
+In the main the targeted SELinux policy works with the context of processes, ports and files. The option -Z displays the context with most tools. Processes need to be authorized to access resources such as ports and files.
+
+ls -Z /etc/shadow # file context
+
+
+u -> user
+
+r -> role
+
+t -> type
+
+num -> level for MLS
+
+ps -Z # processes context
+
+
+Example:
+
+Breaking and fixing Authentication (File context):
+
+Take care that you open two windows with one maintaining the root access as the authentication system will be broken before being fixed. Setting the incorrect on the /etc/shadow file will prevent authentication. Even though the shadow file is accessed with root permissions, access is not granted. The *command restorecon* will set the correct context for the file.
+
+
+window 1
+
+sudo -i
+
+window 2 (break authentication as standard user using sudo)
+
+sudo chcon -t user_home_t /etc/shadow
+
+ls -Z /etc/shadow
+
+sudo -l # authentication error
+
+window 1 (fix)
+
+getenforce # check the mode
+
+setenforce 0 # set permissive mode
+
+getenforce
+
+
+Go to window 2
+
+sudo -l # logging the denials
+
+window 1
+
+journalctl -f
+
+restorecon -v /etc/shadow
+
+setenforce 1 # enforcing mode
+
+window 2
+
+sudo -l
+
+
+##### File Contexts
+
+The file contexts used by *restorecon* are part of the current SELinux policy, we can navigate to where they are stored. if we need to relocate user home directories, for example, we can create the top-level directory and store the definition by cloning the configuration of the existing home. This ensures the correct operation of restorecon and new home directories.
+
+man semanage-fcontext
+
+sudo ls /etc/selinux/targeted/contexts/files 
+
+
+Ex: Setting different home directory
+
+sudo mkdir /devops
+
+ls -ldZ /devops
+
+sudo semanage fcontext -a -t home_root_t "/devops" (or) use: sudo semanage fcontext -a -e /home /devops
+
+ls -ldZ /devops
+
+restorecon -v /devops
+
+if you create new directory inside /devops the same context applied automatilly. Because the policy doing in backend
+
+sudo mkdir /devops/cicd
+
+
+where these policies presented:
+
+sudo ls /etc/selinux/targeted/contexts/files 
+
+sudo cat /etc/selinux/targeted/contexts/files/file_contexts.local
+
+
+##### (Process Context) - Implementing Custom Service Configurations
+
+Previous section is about the SELinx File Context. This section is about the process context especally about process and ports.
+
+
+
+
