@@ -6599,6 +6599,7 @@ sudo systemctl status container_www
 ````
 
 ###### Running Containers with Podman Quadlets
+----------------------------------------------
 
 Podman introduced **Quadlets** as a modern way to manage containers under systemd. While the traditional `podman generate systemd` command still works, it is **deprecated** in favor of Quadlets, which provide a cleaner, more maintainable approach.
 
@@ -6633,6 +6634,12 @@ or
 /etc/containers/systemd/users/$(UID)
 or
 /etc/containers/systemd/users/
+```
+
+**Root containers**
+
+```text
+/etc/containers/systemd/
 ```
 
 Examples:
@@ -6682,12 +6689,6 @@ sudo vim /etc/containers/systemd/users/1002/mysql.container
 * This is useful for **multi-user systems** where admins want to manage user containers centrally.
 
 ---
-
-**Root containers**
-
-```text
-/etc/containers/systemd/
-```
 
 
 Prerequisites
