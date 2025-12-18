@@ -6802,6 +6802,9 @@ rpm -ql podman | grep systemd
 ls -l /usr/lib/systemd/user-generators/
 ```
 
+![Podman Quadlet workflow](./imgs/Podman_quadlet_working.png)
+
+
 ---
 
 
