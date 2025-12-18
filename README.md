@@ -6577,7 +6577,7 @@ You don't have permission to access this resource.
 Apache/2.4.63 (Ubuntu) Server at localhost Port 8080
 ````
 
-###### Creating a Systemd Service Unit for Container
+##### Creating a Systemd Service Unit for Container (Container as a Service)
 
 Creating systemd service unit for container very useful to manage container (automatically spin up new container, when it is deleted. Also stop and start the container using systemctl command)
 
@@ -6804,9 +6804,191 @@ ls -l /usr/lib/systemd/user-generators/
 
 ![Podman Quadlet workflow](./imgs/Podman_quadlet_working.png)
 
-
 ---
 
 
+##### Systemd Service in a Container
 
+Often containers will need just one service (microservice), but if you use containers to test Ansible or other tools you will need to run services in the container.
+
+To do this, Enable SELinux Boolean:
+
+To run systemd in a container, container must be able to manage *Control groups*
+
+  sudo setsebool -P container_manage_cgroup true
+
+
+Example:
+
+**Building Custom Images**
+
+You are building a testing lab for Ansible automation and you need to test on Fedora 38 and Ubnutu 20.04 systems. You need to ensure that services can be installed and started into the containers. To customize images we use a Dockerfile. We start with Fedora, we will eventually SSH to this container so we generate a key pair for authentication.
+
+
+````bash
+sudo setsebool -P container_manage_cgroup true
+
+# Create directories
+mkdir -p ~/project/{fedora,ubuntu}
+
+#---------------cd ~/project/fedora----
+cd ~/project/fedora
+
+# Creating keypairs in user home directory (Not interactive way)
+ssh-keygen -f ~/.ssh/id_rsa -N ""
+
+# Copy public key from user home directory to ~/project/fedora
+cp ~/.ssh/id_rsa.pub .
+
+echo "user1 ALL=(root) NOPASSWD: ALL" > user1
+
+# Checking the file
+visudo -cf ~/project/fedora/user1
+
+vim Dockerfile
+
+```ini
+FROM docker.io/library/fedora:38
+RUN dnf install -y systemd openssh-clients openssh-server python3 vim ansible && dnf clean all
+RUN systemctl enable sshd
+RUN useradd -m user1 -G wheel && echo 'user1:[Password1]' | chpasswd
+COPY --chmod=600 user1 /etc/sudoers.d/
+COPY --chmod=700 --chown=user1:user1 id_rsa.pub /home/user1/.ssh/authorized_keys
+EXPOSE 22
+CMD ["/usr/sbin/init"]
+```
+
+podman image build -t fedora .
+
+podman container run -d --name controller --hostname controller -p 2222:22 fedora
+
+# Login into container
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 2222 user1@localhost
+
+cat /etc/os-release
+
+exit
+
+# Results
+[user1@localhost fedora]$ ssh -p 2222 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null user1@localhost
+Warning: Permanently added '[localhost]:2222' (ED25519) to the list of known hosts.
+[user1@controller ~]$ cat /etc/os-release 
+NAME="Fedora Linux"
+VERSION="38 (Container Image)"
+ID=fedora
+VERSION_ID=38
+VERSION_CODENAME=""
+PLATFORM_ID="platform:f38"
+PRETTY_NAME="Fedora Linux 38 (Container Image)"
+ANSI_COLOR="0;38;2;60;110;180"
+LOGO=fedora-logo-icon
+CPE_NAME="cpe:/o:fedoraproject:fedora:38"
+DEFAULT_HOSTNAME="fedora"
+HOME_URL="https://fedoraproject.org/"
+DOCUMENTATION_URL="https://docs.fedoraproject.org/en-US/fedora/f38/system-administrators-guide/"
+SUPPORT_URL="https://ask.fedoraproject.org/"
+BUG_REPORT_URL="https://bugzilla.redhat.com/"
+REDHAT_BUGZILLA_PRODUCT="Fedora"
+REDHAT_BUGZILLA_PRODUCT_VERSION=38
+REDHAT_SUPPORT_PRODUCT="Fedora"
+REDHAT_SUPPORT_PRODUCT_VERSION=38
+SUPPORT_END=2024-05-14
+VARIANT="Container Image"
+VARIANT_ID=container
+[user1@controller ~]$ exit
+logout
+Connection to localhost closed.
+[user1@localhost fedora]$ 
+
+
+podman container top <container_name>
+
+
+#---------------cd ~/project/ubuntu---
+
+cd ~/project/ubuntu
+
+cp ~/project/fedora/Dockerfile ~/project/fedora/user1 ~/project/fedora/id_rsa.pub .
+
+vim Dockerfile
+
+FROM docker.io/library/ubuntu:focal
+RUN apt-get update && apt-get install -y systemd openssh-server python3 sudo 
+&& apt-get clean
+RUN systemctl enable ssh
+RUN useradd -m user1 -G sudo && echo 'user1:[Password1]' | chpasswd
+COPY --chmod=600 user1 /etc/sudoers.d/
+COPY --chmod=700 --chown=user1:user1 id_rsa.pub /home/user1/.ssh/authorized_keys
+EXPOSE 22
+CMD ["/usr/sbin/init"]
+
+
+podman image build -t ubuntu .
+
+podman image ls
+
+podman container run -d -p 2022:22 --name ubuntu --hostname ubuntu ubuntu
+
+
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 
+2022 user1@localhost
+
+# change shell
+chsh user1 -s /bin/bash
+
+enter user1 password
+
+exit
+
+exit
+
+
+podman container inspect ubuntu | grep 
+-A10 Network
+
+````
+
+--------- setup commincation between two containers ------
+
+
+### Podman Network
+
+Using the default network you cannot communicate between container or resolve names. Creating your own network and adding containers to the network will allow communication between containers.
+
+````bash
+podman network ls
+
+ip link
+
+podman network create my-net-ansible --subnet 172.16.1.0/24 --gateway 172.16.1.1
+
+
+podman container rm -f ubuntu
+
+podman container rm -f controller
+````
+
+Create Containers on Network: (Bridge Network)
+
+You can delete the existing containers and recreate them on the new network. Additionally, the controller can connect to the original host network using port mapping for ease of access. From the controller you can access the ubuntu container using the container name.
+
+````bash
+podman container run -d --name controller --hostname controller -p 2222:22 --network my-net-ansible fedora
+
+podman container run -d --name ubuntu --hostname ubuntu --network my-net-ansible ubuntu
+
+podman container inspect controller | grep -A20 Network
+
+
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 
+2222 user1@localhost
+
+# connect to ubuntu container from contoller container
+ssh user1@ubuntu
+
+# connect to controller container from the ubuntu container
+ssh controller
+
+Note: this is 2 way connection
+````
 
