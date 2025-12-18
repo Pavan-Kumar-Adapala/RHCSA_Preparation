@@ -6153,6 +6153,656 @@ sudo cat /etc/selinux/targeted/contexts/files/file_contexts.local
 
 Previous section is about the SELinx File Context. This section is about the process context especally about process and ports.
 
+SELinux and Ports:
+
+The process running a service must be authorized to access a port in the same way as they need file system access. If we want the web server to run on a *non-standard port* then we need to allow that port to prevent errors.
+
+````bash
+# Example: Installing Apache webserver, by default it running on the port 80. 
+
+# I am changing the port 80 to 1000 for the web service. This cause issue, the web service not start after changing the port in the configuration file. 
+
+# you will see, how to debug the issue?
+
+sudo -i
+
+sudo install -y httpd
+
+grep 80 /etc/httpd/conf/httpd.conf
+
+semanage port -l | grep http # list out the available ports for http deamon
+
+# Changing the port inside configuration file, not listed on "semanage port -l | grep http"
+sed -Ei 's/^(Listen) 80/\1 1000/' /etc/httpd/httpd.conf
+
+grep 1000 /etc/httpd/conf/httpd.conf
+
+systemctl status httpd
+
+systemctl stop httpd
+
+systemctl start httpd
+
+# Debugging 
+ausearch -m AVC -ts recent # Audit logs
+
+-m -> module
+AVC -> access vector controls
+-ts -> time stamp
+
+# you can enable SETroubleshoot server
+
+grep sealert /var/log/messages
+
+# To get idea, what is the problem is and sugesstions?
+sealert -l <alert-id>
+
+# to slove the issue
+sudo semanage port -a -t httpd_port_t -p tcp 1000
+
+systemctl start httpd
+
+ss -ntl
+````
+
+Manage Web Content with SELinux:
+
+The *DocumentRoot* of Apache specifies the default location to find web content. This defaults to */var/www/html*. we can change this but the SELinux context needs to be correct for the directory and all content.
+
+````bash
+
+sudo -i
+
+mkdir /web
+
+ls -ld /web
+
+find /usr/share/doc/git/ -type f -name "*.html" -exec cp {} /web \;
+
+ls -l /web
+
+# http configuration
+
+grep /var/www/html /etc/httpd/conf/httpd.conf
+
+# /var/www/html -> /web
+sed -i 's/\/var\/www\/html/\/web/' /etc/httpd/conf/httpd.conf
+
+grep /web /etc/httpd/conf/httpd.conf
+
+systemctl restart httpd
+
+systemctl status httpd
+
+# access the web pages inside /web
+curl http://localhost:<port>/<anyfile_inside_web_dir.html>
+
+# you got 403 error for above, debugging
+
+ls -l /web
+
+ausearch -m AVC -ts recent
+
+grep sealert /var/log/messages
+
+sealert -l <alert-id>
+
+man semange-fcontext # check examples
+
+semange fcontext -a -t httpd_sys_context_t "/web(/.*)?"
+
+restorecon -R -v /web
+
+curl http://localhost:<port>/<anyfile_inside_web_dir.html>
+````
+
+## Module 10 - Podman
+
+### Getting started with Podman
+
+**Linux Kernel Namespaces - isolating using unshare**
+
+Even without any container management you can demonstrate isolation. Using the command *unshare* as root, you can create namespace and show their isolation.
+
+Examples:
+
+````bash
+# isolate processes
+sudo bash ; ps
+
+exit
+
+sudo unshare --fork --pid --mount-proc bash ; ps
+
+exit
+
+# isolate networks
+ip addr show
+
+sudo unshare --fork --pid --net --mount-proc bash ; ip addr show
+
+exit
+
+man unshare
+````
+#### Install Podman
+
+Installing Podman:
+
+Podman is available in the standard RedHat repositories. If we want to *install podman-compose for orchestration* we can either add EPEL repository or install podman-compose using the python pip installer.
+
+```
+yum install podman*
+
+sudo yum install <EPEL repo link>
+
+sudo yum update
+
+sudo yum install podman podman-compose
+```
+
+#### Working with with Registries and Images
+
+
+old commands (still works):
+
+podman images
+
+podman ps
+
+podman ps -a
+
+
+New commands:
+
+podman image ls
+
+podman container ls
+
+podman container ls -a
+
+ex:
+
+podman run -it hello
+
+
+**Registries and Shortnames**
+
+Container registries act as storage locations for images, can access images but the fully qualified name or as an alias or shortname. You accessed the image "hello", which points to *quay.io/podman/hello*
+
+```
+tree .local/
+
+# configuration 
+cat /etc/containers/registries.conf
+
+# quay.io/podman/hello
+grep "hello" /etc/containers/registries.conf.d/000-shortnames.conf
+```
+
+**Images**
+
+```
+# search from docker registry
+podman image search fedora 
+
+podman image pull <docker.io/fedora>
+
+podman image ls
+
+# Understand image metadata
+podman image inspect fedora 
+
+# Filter from the total metadata
+podman image inspect fedora --format "{{json .config}}"
+
+podman image inspect fedora --format "{{json .config.Cmd}}"
+```
+
+#### Understanding Containers
+
+Overview:
+
+- Containers are runtime instances of images
+- Using *skopeo* command to understand which image we need (image Versions)
+- Running Containers
+  - detached
+  - foreground
+  - reading logs
+- Stopping and starting
+- Deleting and pruning
+
+**skopeo**
+Using skopeo, you are able to query the image before it is downloaded. Checking the RepoTags, we can see there are different versions of the image. Manipulating the data we can view the versions.
+
+```
+sudo yum install -y skopeo
+
+skopeo inspect docker://docker.io/library/fedora:latest
+
+skopeo inspect --format "{{.RepoTags}}" docker://docker.io/library/fedora:latest | tr ' ' '\n'
+```
+
+##### Container Management
+```
+podman image ls
+
+podman container ls -a
+
+# Run the container using the image (Foreground)
+
+podman container run -it --name fedora fedora
+
+or
+
+podman container run --rm -it --name fedora fedora # auto removes the container, when it is stopped state
+
+
+# Run the container using the image (Detached)
+
+podman container run -d --name fedora fedora
+
+podman container ls
+
+podman attach fedora # into container
+
+ctrl + p and ctrl + q to leave the container and return to system shell
+
+podman container ls
+
+# Delete all containers are not running
+
+podman container prune 
+
+or
+
+podman container prune -f 
+
+# Delete single stopped container
+
+podman container rm <container name or container ID>
+
+
+# Stop the container
+
+podman container stop <container name or container ID>
+
+# Start
+
+podman container start <container name or container ID>
+
+```
+
+##### Container Monitoring
+
+podman container inspect <container name or container id>
+
+podman container top <container name or container id>
+
+
+**Container Logs**
+
+podman container logs <container name or container id>
+
+
+#### Example: Running a web server uisng local content
+
+````bash
+# Install web browzer or you can use curl
+sudo yum install w3m
+
+podman image search apache2
+
+
+# Install skopeo to inspect images
+sudo yum install -y skopeo
+
+skopeo inspect docker://docker.io/ubuntu/apache2
+
+# pull the image 
+podman image pull <docker.io/ubuntu/apache2:tag>
+
+podman image ls
+
+# Run the image from the pulled image
+
+podman container run -d --name www apache2docker.io/ubuntu/apache2
+
+podman container ls
+
+# Enter into Container
+
+podman exec -it www /bin/bash
+
+# Execute commands inside container
+
+cat /etc/os-release
+
+date
+
+# Exit from the container
+
+exit
+
+# Read metadata from the container
+
+podman container inspect --format "{{.config.Cmd}}" www
+
+# Delete running container
+
+podman container rm -f www
+
+# Port Mapping, Time zone enviromental variable
+
+podman container run -d --name www -p 8080:80 -e 'TZ=Europe/Germany' docker.io/ubuntu/apache2
+
+podman container ls
+
+# open it in the web browzer
+
+w3m http://localhost/8080
+
+quit
+
+# podman exec -it www /bin/bash
+
+date
+
+exit
+
+podman container rm -f www
+
+
+Note: (firewall - accept other systemts requested with port 8080)
+
+sudo firewall-cmd --permanent --add-port=8080/tcp
+sudo firewall-cmd --reload
+````
+
+##### How to server Own Web content
+
+SELinux:
+
+If you want to use your own web content, which is certain if you need to test a website. You can map volumes to the web server. SELinux will cause a problem; so you MUST set the correct context for your web files. The content is part of the course repo, here you need to set the context to *container_file_t*
+
+````bash
+ls -l ~/podman/www # This is your OWN WEB CONTENT
+
+If the path not existed, than
+
+git clone https://github.com/theurbanpenguin/podman
+
+Change SELinux context:
+
+sudo chcon -Rt container_file_t /home/user1/podman/www
+
+
+[user1@localhost ~]$ ls -lZ podman/
+total 8
+-rw-r--r--. 1 user1 user1 unconfined_u:object_r:user_home_t:s0      1371 Dec 17 06:21 build.sh
+drwxr-xr-x. 5 user1 user1 unconfined_u:object_r:user_home_t:s0        71 Dec 17 06:21 project
+-rw-r--r--. 1 user1 user1 unconfined_u:object_r:user_home_t:s0        45 Dec 17 06:21 README.md
+drwxr-xr-x. 6 user1 user1 unconfined_u:object_r:container_file_t:s0  133 Dec 17 06:21 www
+
+[user1@localhost ~]$ ls -lZ podman/www
+total 52
+drwxr-xr-x. 3 user1 user1 unconfined_u:object_r:container_file_t:s0 4096 Dec 17 06:21 css
+drwxr-xr-x. 2 user1 user1 unconfined_u:object_r:container_file_t:s0  187 Dec 17 06:21 fonts
+drwxr-xr-x. 2 user1 user1 unconfined_u:object_r:container_file_t:s0 4096 Dec 17 06:21 images
+-rwxr-xr-x. 1 user1 user1 unconfined_u:object_r:container_file_t:s0 6738 Dec 17 06:21 index.html
+drwxr-xr-x. 2 user1 user1 unconfined_u:object_r:container_file_t:s0 4096 Dec 17 06:21 js
+-rwxr-xr-x. 1 user1 user1 unconfined_u:object_r:container_file_t:s0 8746 Dec 17 06:21 media.html
+-rwxr-xr-x. 1 user1 user1 unconfined_u:object_r:container_file_t:s0 9307 Dec 17 06:21 our-story.html
+-rwxr-xr-x. 1 user1 user1 unconfined_u:object_r:container_file_t:s0 8090 Dec 17 06:21 robotics.html
+
+
+# Volume mapping
+
+podman container run -d --name www -e TZ='Europe/Germany' -p 8080:80 -v /home/user1/podman/www/:/var/www/html docker.io/ubuntu/apache2
+
+w3m http://localhost/8080
+
+podman container rm -f www
+
+
+Note:
+
+Without this command running: sudo chcon -Rt container_file_t /home/user1/podman/www
+
+You will get the Error:
+
+Forbidden
+
+You don't have permission to access this resource.
+Apache/2.4.63 (Ubuntu) Server at localhost Port 8080
+````
+
+###### Creating a Systemd Service Unit for Container
+
+Creating systemd service unit for container very useful to manage container (automatically spin up new container, when it is deleted. Also stop and start the container using systemctl command)
+
+````bash
+sudo podman generate systemd <container_name>
+
+sudo podman generate systemd <container_name> | sudo tee /etc/systemd/system/container_www.service
+
+sudo systemctl daemon-reload
+
+podman container stop www
+
+sudo systemctl status container_www
+
+sudo systemctl enable --now container_www.service
+
+sudo systemctl status container_www
+
+````
+
+###### Running Containers with Podman Quadlets
+
+Podman introduced **Quadlets** as a modern way to manage containers under systemd. While the traditional `podman generate systemd` command still works, it is **deprecated** in favor of Quadlets, which provide a cleaner, more maintainable approach.
+
+````bash
+[user1@localhost ~]$ podman generate systemd www
+
+DEPRECATED command:
+It is recommended to use Quadlets for running containers and pods under systemd.
+````
+
+
+What Are Quadlets?
+-----------------
+
+A **Quadlet** is a **systemd unit file written in a simpler, container-aware format**. It allows you to define a container declaratively, including ports, volumes, environment variables, and restart policies, without dealing with complex generated systemd units.
+
+Official documentation: [Podman Systemd Unit](https://docs.podman.io/en/stable/markdown/podman-systemd.unit.5.html)
+
+![Podman Quadlet](./imgs/Podman_Quadlet.png)
+
+
+Quadlet Directory Structure
+---------------------------
+
+The location of Quadlet files depends on whether you are running **rootless** or **root**:
+
+**Rootless (user containers)**
+
+```text
+~/.config/containers/systemd/
+or
+/etc/containers/systemd/users/$(UID)
+or
+/etc/containers/systemd/users/
+```
+
+Examples:
+
+![Podman Quadlets Rootless](./imgs/Podman_Quadlets_rootless.png)
+
+**Rootless Quadlets (`~/.config/containers/systemd/`)**
+
+**User: user1**
+
+mkdir -p ~/.config/containers/systemd
+
+*Create a Quadlet for an Apache container*
+
+vim ~/.config/containers/systemd/www.container
+
+systemctl --user daemon-reload
+
+systemctl --user start container-www
+
+**Rootless Quadlets (`/etc/containers/systemd/users/$(UID)`)**
+
+Suppose user1 has UID 1001. Admin wants to provide a Quadlet without touching their home:
+
+```bash
+sudo mkdir -p /etc/containers/systemd/users/1001
+sudo vim /etc/containers/systemd/users/1001/www.container
+```
+
+**Rootless Quadlets (`/etc/containers/systemd/users/`)**
+
+```bash
+sudo mkdir -p /etc/containers/systemd/users/
+sudo mkdir -p /etc/containers/systemd/users/1001
+sudo mkdir -p /etc/containers/systemd/users/1002
+```
+
+* Admin places Quadlets for user1 in `1001/` and for user2 in `1002/`
+
+```bash
+sudo vim /etc/containers/systemd/users/1001/www.container
+sudo vim /etc/containers/systemd/users/1002/mysql.container
+```
+
+* Each user sees **only their own Quadlets**.
+* User cannot modify other users’ Quadlets.
+* This is useful for **multi-user systems** where admins want to manage user containers centrally.
+
+---
+
+**Root containers**
+
+```text
+/etc/containers/systemd/
+```
+
+
+Prerequisites
+-------------
+
+1. **Podman version**:
+
+```bash
+podman --version
+```
+
+2. **Systemd version**: Quadlets require **systemd ≥ 253** for user generators to reliably pick up `.container` files:
+
+```bash
+systemctl --version
+```
+
+
+
+Why `.container` and Not `.service`?
+------------------------------------
+
+The file extension tells Podman + systemd what kind of object it is:
+
+| Extension    | Meaning                |
+| ------------ | ---------------------- |
+| `.container` | Single container       |
+| `.pod`       | Podman pod             |
+| `.volume`    | Podman volume          |
+| `.network`   | Podman network         |
+| `.kube`      | Kubernetes YAML        |
+| `.image`     | Image pull/update unit |
+
+![Podman Quadlet File Extensions](./imgs/Podman_Quadlets_fileextensions.png)
+
+
+Example: Apache Web Server Container
+------------------------------------
+
+Step 1: Create the Quadlet Directory
+
+````bash
+[user1@localhost ~]$ mkdir -p ~/.config/containers/systemd
+````
+
+Step 2: Create the Quadlet File
+
+````bash
+[user1@localhost ~]$ vim ~/.config/containers/systemd/www.container
+````
+
+Paste the following:
+
+```ini
+[Unit]
+Description=Apache Web Server (www)
+After=network.target
+
+[Container]
+Image=docker.io/ubuntu/apache2:latest
+Name=www
+
+# Environment variable
+Environment=TZ=Europe/Germany
+
+# Port mapping
+PublishPort=8080:80
+
+# Volume mount
+Volume=/home/user1/podman/www:/var/www/html
+
+# Auto-update image
+AutoUpdate=registry
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
+```
+
+Step 3: Reload systemd and Start the Container
+
+```bash
+systemctl --user daemon-reload
+systemctl --user start container-www
+```
+
+> **Note:** Podman generates the service name as `container-<name>`. In this case, it becomes `container-www`.
+
+
+Step 4: Enable Auto-Start
+
+```bash
+systemctl --user enable container-www
+```
+
+Troubleshooting
+
+If the container does not start, check:
+
+```bash
+systemctl --user list-unit-files | grep podman
+systemctl --user list-unit-files | grep www
+```
+
+Verify that the Quadlet generator is installed and available:
+
+```bash
+rpm -ql podman | grep systemd
+ls -l /usr/lib/systemd/user-generators/
+```
+
+---
+
 
 
 
