@@ -6930,8 +6930,7 @@ podman image ls
 podman container run -d -p 2022:22 --name ubuntu --hostname ubuntu ubuntu
 
 
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 
-2022 user1@localhost
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 2022 user1@localhost
 
 # change shell
 chsh user1 -s /bin/bash
@@ -6943,8 +6942,7 @@ exit
 exit
 
 
-podman container inspect ubuntu | grep 
--A10 Network
+podman container inspect ubuntu | grep -A10 Network
 
 ````
 
@@ -6980,8 +6978,7 @@ podman container run -d --name ubuntu --hostname ubuntu --network my-net-ansible
 podman container inspect controller | grep -A20 Network
 
 
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 
-2222 user1@localhost
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 2222 user1@localhost
 
 # connect to ubuntu container from contoller container
 ssh user1@ubuntu
@@ -6991,4 +6988,29 @@ ssh controller
 
 Note: this is 2 way connection
 ````
+
+### Podman-compose (Orchestrating containers)
+
+
+Podman-compose is installed using EPEL repo or using pip
+
+
+podman system prune -a -f # Remove unused images, networks, containers ...
+
+podman-compose --help
+
+podman-compose up 
+
+podman-compose up -d # detach mode
+
+podman-compose stop
+
+podman-compose start
+
+podman-compose down
+
+
+podman-compose build # only building images defined in the compose file services section under build
+
+
 
