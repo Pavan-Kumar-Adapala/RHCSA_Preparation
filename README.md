@@ -47,7 +47,9 @@ sudo useradd -m <username>
 sudo passwd <username>
 
 sudo usermod -aG <groupname> <username>
+
 (or)
+
 sudo groupmod -a -U <username> <group-name>
 
 
@@ -58,6 +60,7 @@ sudo -> used to elevated previliages of current user
 sudo yum install -y bash-completion
 
 Note:
+
 The sudo command allows permitted users to execute commands as another user, typically root.
 
 Configurations are managed in **/etc/sudoers or under /etc/sudoers.d/**.
@@ -87,6 +90,7 @@ How to check the groups the user belog to?
 
 Question:
 ----------
+
 Create a user named **devops** who can restart the httpd service using sudo but cannot run any other privileged command.
 
 Create user
@@ -160,14 +164,15 @@ Simllar questions:
 
     ops ALL=(ALL) NOPASSWD: /usr/local/bin/daily_backup.sh
     
-    
+---
 
-''''' system users (service accounts) ''''''
+### system users (service accounts)
 
 
 **What Are System Users?**
 
 System users are **non-login users** created to **own or run services, scripts, or background processes**, not for interactive login.
+
 They typically:
 
 * Have **no home directory**
@@ -431,6 +436,7 @@ wc -l /file1  (numner of lines in the file)
 
 
 Question:
+
 Redirect both STDOUT and STDERR of /usr/bin/find /etc -name passwd into /tmp/find_output.log
 
 
@@ -450,7 +456,9 @@ cat /tmp/find_output.log
 
 **Text Editors**
 ----------------
+
 nano
+
 vim
 
 note: vimtutor
@@ -529,6 +537,7 @@ delete files
     
 
 Question:
+
     Create a directory /archive and move all .log files from /var/log that are older than 7 days.
 
 
