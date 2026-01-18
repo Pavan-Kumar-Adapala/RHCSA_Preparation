@@ -4111,6 +4111,7 @@ mount -t xfs
 ````
 
 **Snapshot**
+
 sudo stratis filesystem snapshot pool1 fs1 snap1
 
 sudo mkdir /backup
@@ -4154,6 +4155,124 @@ stratis create a pool between the filesystem and physical storage.
 
 - Stratis provides snapshots, easier management, pooling
 
+
+VDO, LVM, and Stratis comparsion:
+
+LVM — Volume Management Core
+
+What LVM actually is
+- LVM (Logical Volume Manager) is a volume manager.
+- Its job is to slice, combine, resize, and map block devices.
+
+It does NOT care about:
+
+- deduplication
+- compression
+- filesystem-level features
+
+```
+Filesystem
+   ↓
+Logical Volume (LV)
+   ↓
+Volume Group (VG)
+   ↓
+Physical Volume (PV)
+   ↓
+Physical Disk
+```
+
+What LVM is good at
+
+✅ Pooling disks
+✅ Resizing volumes (online/offline)
+✅ Snapshots (copy-on-write, block-level)
+✅ RAID (via dm-raid)
+❌ No deduplication
+❌ No compression
+
+👉 LVM answers:
+
+“How do I manage disks flexibly?”
+
+---
+
+VDO — Space Efficiency Engine
+
+What VDO actually is
+- VDO is NOT a volume manager.
+- It is a block-level data optimization layer.
+
+Its ONLY focus:
+
+- Deduplication
+- Compression
+- Thin provisioning
+
+```
+Filesystem
+   ↓
+VDO (dedup + compression + thin)
+   ↓
+Physical Block Device (disk / LVM LV)
+```
+Important:
+
+VDO can sit on top of a disk OR on top of an LVM LV
+
+What VDO is good at
+
+✅ Inline deduplication
+✅ Compression
+✅ Logical size > physical size
+❌ No snapshots
+❌ No disk pooling
+❌ No volume resizing logic
+
+👉 VDO answers:
+
+“How do I store MORE data using LESS disk?”
+
+---
+
+Stratis — Modern Storage Manager (LVM + extras)
+
+What Stratis actually is
+
+Stratis is a storage management layer built on top of existing tech:
+
+- device-mapper
+- LVM concepts
+- XFS
+- thin provisioning
+  
+But it hides the complexity.
+
+Where Stratis sits
+
+```
+Filesystem (XFS)
+   ↓
+Stratis Filesystem (thin)
+   ↓
+Stratis Pool (similar to VG)
+   ↓
+Physical Disks
+```
+
+What Stratis is good at
+
+✅ Pool-based management
+✅ Thin-provisioned filesystems
+✅ Snapshots (filesystem-level)
+✅ Easy CLI (fewer steps than LVM)
+❌ No deduplication
+❌ No compression
+
+👉 Stratis answers:
+
+“How do I manage storage easily and safely with modern defaults?”
+---
 
 ### SELinux and NFS onfiguration
 
