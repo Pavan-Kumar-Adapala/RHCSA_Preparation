@@ -4155,6 +4155,7 @@ stratis create a pool between the filesystem and physical storage.
 
 - Stratis provides snapshots, easier management, pooling
 
+---
 
 VDO, LVM, and Stratis comparsion:
 
@@ -4195,7 +4196,7 @@ What LVM is good at
 
 “How do I manage disks flexibly?”
 
----
+
 
 VDO — Space Efficiency Engine
 
@@ -4233,7 +4234,7 @@ What VDO is good at
 
 “How do I store MORE data using LESS disk?”
 
----
+
 
 Stratis — Modern Storage Manager (LVM + extras)
 
@@ -4273,7 +4274,14 @@ What Stratis is good at
 
 How do I manage storage easily and safely with modern defaults?
 
+
+![LVM Vs VDO Vs Stratis](./imgs/VDO_LVM_Stratis.png)
+
+
+![LVM Vs VDO Vs Stratis](./imgs/LVM_VDO_Stratis_under.png)
 ---
+
+
 
 ### SELinux and NFS onfiguration
 
