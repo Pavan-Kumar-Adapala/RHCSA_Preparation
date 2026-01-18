@@ -4271,7 +4271,8 @@ What Stratis is good at
 
 👉 Stratis answers:
 
-“How do I manage storage easily and safely with modern defaults?”
+How do I manage storage easily and safely with modern defaults?
+
 ---
 
 ### SELinux and NFS onfiguration
